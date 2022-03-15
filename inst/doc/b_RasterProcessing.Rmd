@@ -1,0 +1,216 @@
+---
+title: "2. Processing Raster Data"
+author:
+- Hannah L. Owens
+- Carsten Rahbek
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::html_vignette:
+    fig_caption: yes
+    fig_width: 7
+    fig_height: 7
+    toc: true
+    toc_depth: 3
+vignette: >
+  %\VignetteIndexEntry{2. Processing Raster Data}
+  \usepackage[utf8]{inputenc}
+  %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, error = FALSE, fig.retina = 1, dpi = 80)
+knitr::opts_knit$set(root.dir = system.file('extdata', 
+                                            package='voluModel'))
+load(system.file("extdata/oxygenSmooth.RData", 
+                 package='voluModel'))
+```
+
+# Introduction 
+
+Naturally, to build 3D distribution models, one needs three-dimensionally structured environmental data. These data may come in the form of interpolated *in situ* measurements (e.g. [NOAA's World Ocean Atlas dataset](https://www.ncei.noaa.gov/access/world-ocean-atlas-2018/); Garcia et al. 2018a) or as outputs from climate models, either as stand-alone ocean components or as a component of coupled atmosphere-ocean models (e.g. CCSM3, Collins et al. 2006; HadCM3, Valdes et al. 2017). Typically, these data are organized as a series of horizontal layers that are stacked by depth. 
+
+```{r load packages, message=FALSE, warning=FALSE}
+library(voluModel) # Since this is the package this vignette is about.
+library(rgdal) # For vector stuff. Will eventually be replaced with sf.
+library(raster) # For raster stuff. Will eventually be replaced with terra.
+library(tibble) # For data organization
+library(ggplot2) # For supplementary visualization
+library(fields) # For raster interpolation
+library(latticeExtra) # Some fancy plotting
+```
+
+# Data Inputs
+
+First, let's look at a relatively simple environmental variable from the WOA: temperature (Locarnini et al, 2018). These data are supplied by the World Ocean Atlas as point shapefiles; the version supplied here has been cropped between -110 and -40 longitude and between -5 and 50 latitude to make it more memory-efficient. You can download the full dataset via the WOA website. Our first task is to read in the shapefile as a `SpatialPointsDataFrame`. Note that each row in `temperature@data` is a set of horizontal coordinates. Each column is a vertical position in the water column. Make sure to check the metadata of the data you use. Different sources may use vertical depth structures.
+
+```{r environmental data loading temperature, eval=T, message=FALSE, warning=FALSE, asis=T}
+td <- tempdir()
+unzip(system.file("extdata/woa18_decav_t00mn01_cropped.zip", 
+                  package = "voluModel"),
+      exdir = paste0(td, "/temperature"), junkpaths = T)
+temperature <- readOGR(dsn = paste0(td, "/temperature"), 
+                       layer ="woa18_decav_t00mn01_cropped")
+unlink(paste0(td, "/temperature"), recursive = T)
+
+# Specifying "no data" value
+temperature@data[temperature@data == -999.999] <- NA
+
+# Looking at the dataset
+head(temperature@data)
+
+# Plotting the dataset
+layout(matrix(c(1, 2), ncol=2, byrow=TRUE), widths=c(4, 1))
+land <- rnaturalearth::ne_countries(scale = "medium", 
+                                    returnclass = "sf")[1]
+ext <- extent(temperature@coords)
+plot(temperature, main = "Distribution of voluModel Subset\nof WOA Temperature 2018",
+     pch = 20, col = "red", xlim = ext[1:2], ylim = ext[3:4], cex = .6)
+plot(land, col = "black", add = T)
+
+# What does the WOA depth structure look like?
+depths <- colnames(temperature@data)
+depths <- as.numeric(gsub(depths[-1], pattern = "[d,M]", replacement = ""))
+plot(0, xlim = c(0,1), ylim = c(0-max(depths), 0), axes=FALSE, type = "n", xlab = "", ylab = "Depth Intervals (m)")
+axis(2, at = 0-depths, labels = depths)
+```
+
+Next, we convert temperature into a `RasterBrick`. While we are at it, we will generate a raster from the deepest value available for each point. While you might call this a "bottom" raster, it is important to note that in some cases, values are not available for the bottom. After the `RasterBrick` is created, we give it the same depth names as the columns in the `SpatialPointsDataFrame`. This is important, because `voluModel` uses these names as z coordinates when handling 3D data. I am using `oneRasterPlot()` from voluModel to visualize the rasters using a uniform, high-contrast asthetic.
+
+```{r temperature processing}
+#Creating a bottom raster from the point shapefile
+temperatureBottom <- bottomRaster(temperature)
+
+# Creating a 3D temperature RasterBrick from the point shapefile
+temperature <- rasterFromXYZ(cbind(temperature@coords,
+                                   temperature@data))
+
+# Get names of depths
+envtNames <- gsub("[d,M]", "", names(temperature))
+envtNames[[1]] <- "0"
+names(temperature) <- envtNames
+
+# How do these files look?
+p1 <- oneRasterPlot(temperature[[1]], land = land, landCol = "black", 
+              title= "Temperature (C)")
+
+# R won't let you name the layers numbers only--it pastes an X at the beginning
+p2 <- oneRasterPlot(temperature[["X100"]], land = land, landCol = "black", 
+              title= "Temperature (C)")
+
+p3 <- oneRasterPlot(temperatureBottom,land = land, landCol = "black", 
+              title = "Temperature (C)")
+
+temp <- c("Surface" = p1, "100m Depth" = p2, "Bottom" = p3)
+update(temp, strip  = strip.custom(strip.levels = TRUE,
+                             horizontal = TRUE,
+                             bg = "black",
+                             fg = "white",
+                             par.strip.text = list(col = "white", cex = 1.2, font = 2)))
+```
+
+# Interpolation
+
+Next, we have a bit of a more complicated example: apparent oxygen utilization (AOU; Garcia et al, 2018b). Apparent oxygen usage is more patchily sampled than temperature (it's generally measured from instrument casts on research cruises, and the coverage isn't quite as dense as for temperature).
+
+```{r environmental data loading oxygen, eval=T, message=FALSE, warning=FALSE, asis=T}
+td <- tempdir()
+unzip(system.file("extdata/woa18_all_A00mn01_cropped.zip", 
+                  package = "voluModel"),
+      exdir = paste0(td, "/oxygen"), junkpaths = T)
+# do something with the files
+oxygen <- readOGR(dsn = paste0(td, "/oxygen"), 
+                  layer = "woa18_all_A00mn01_cropped")
+unlink(paste0(td, "/oxygen"), recursive = T)
+
+oxygen@data[oxygen@data == -999.999] <- NA
+
+plot(oxygen, main = "Distribution of voluModel subset of WOA AOU 2018",
+     pch = 20, col = "red", xlim = ext[1:2], ylim = ext[3:4], cex = .6)
+plot(land, col = "black", add = T)
+```
+
+There is a workaround for this, since we can reasonably expect some degree of spatial autocorrelation in apparent oxygen utilization. We use the `interpolateRaster()` function to produce statistically-interpolated layers using `TPS()` from the `fields` package (this is a thin-plate spline interpolation). Be patient--this step can take a while, although as shown here, I am using the `fastTPS()` approximation, which only samples from nearby cells to speed things up. Maybe `fastTPS()` will work ok for your data, maybe it won't. It depends on the data.
+
+```{r interpolate oxygen, warning=FALSE, eval = F}
+# Creating a RasterBrick
+oxygen <- rasterFromXYZ(cbind(oxygen@coords, oxygen@data))
+
+for (i in 1:nlayers(oxygen)){
+  oxygen[[i]] <- interpolateRaster(oxygen[[i]], lon.lat = T, fast = T, aRange = 5) #Thin plate spline interpolation
+  oxygen[[i]] <- crop(mask(x = oxygen[[i]], mask = temperature[[i]]), temperature[[i]])
+}
+
+# Change names to match temperature
+names(oxygen) <- envtNames
+```
+
+```{r interpolate oxygen surface only, warning=FALSE}
+# Creating a RasterBrick
+oxygen <- rasterFromXYZ(cbind(oxygen@coords, oxygen@data[["SURFACE"]]))
+
+for (i in 1:nlayers(oxygen)){
+  oxygen[[i]] <- interpolateRaster(oxygen[[i]], lon.lat = T, fast = T, aRange = 5) #Thin plate spline interpolation
+  oxygen[[i]] <- crop(mask(x = oxygen[[i]], mask = temperature[[i]]), temperature[[i]])
+}
+
+# Change names to match temperature
+names(oxygen) <- envtNames[[1]]
+```
+
+Some environmental data rasters may also look "patchy", possibly as an artifact of uneven sampling. If you are confident that there should be a strong spatial correlation in a data layer that looks "patchy", you can also statistically smooth it, again using `TPS()`, like this:
+
+```{r smoothing oxygen, eval=FALSE}
+oxygenSmooth <- oxygen
+for (i in 1:nlayers(oxygen)){
+  oxygenSmooth[[i]] <- smoothRaster(oxygenSmooth[[i]], lon.lat = T) #Thin plate spline interpolation
+  oxygenSmooth[[i]] <- crop(mask(x = oxygenSmooth[[i]], mask = temperature[[i]]), temperature[[i]])
+}
+
+# Change names to match temperature
+names(oxygenSmooth) <- names(temperature)
+
+p1 <- oneRasterPlot(oxygen[[1]], land = land, landCol = "black", 
+              title= "Apparent Oxygen Utilization (µmol/kg) at Surface")
+p2 <- oneRasterPlot(oxygenSmooth[[1]], land = land, landCol = "black", 
+              title= "Apparent Oxygen Utilization (µmol/kg) at Surface")
+
+temp <- c("Interpolated" = p1, "Interpolated and Smoothed" = p2)
+update(temp, strip  = strip.custom(strip.levels = TRUE,
+                             horizontal = TRUE,
+                             bg = "black",
+                             fg = "white",
+                             par.strip.text = list(col = "white", cex = 1.2, font = 2)))
+```
+```{r smooth oxygen display, echo=FALSE}
+p1 <- oneRasterPlot(oxygen, land = land, landCol = "black", 
+              title= "Apparent Oxygen Utilization (µmol/kg) at Surface")
+p2 <- oneRasterPlot(oxygenSmooth[[1]], land = land, landCol = "black", 
+              title= "Apparent Oxygen Utilization (µmol/kg) at Surface")
+
+temp <- c("Interpolated" = p1, "Interpolated and Smoothed" = p2)
+update(temp, strip  = strip.custom(strip.levels = TRUE,
+                             horizontal = TRUE,
+                             bg = "black",
+                             fg = "white",
+                             par.strip.text = list(col = "white", cex = 1.2, font = 2)))
+```
+
+# References
+
+Collins WD, Bitz CM, Blackmon ML, Bonan GB, Bretherton CS, Carton JA, Chang P, Doney SC, Hack JJ, Henderson TB, Kiehl JT, Large WG, McKenna DS, Santer BD, Smith RD. (2006) The Community Climate System Model Version 3 (CCSM3) Journal of Climate, 19(11), 2122–2143 DOI: 10.1175/jcli3761.1
+
+Garcia HE, Boyer P, Baranova OK, Locarnini RA, Mishonov AV, Grodsky A, Paver CR, Weathers KW, Smolyar IV, Reagan JR, Seidov D, Zweng MM. (2018a). World Ocean Atlas 2018 (A. Mishonov, Ed.). NOAA National Centers for Environmental Information. https://accession.nodc.noaa.gov/NCEI-WOA18
+
+Garcia HE, Weathers K, Paver CR, Smolyar I, Boyer TP, Locarnini RA, Zweng MM, Mishonov AV, Baranova OK, Seidov D, Reagan JR (2018b). World Ocean Atlas 2018, Volume 3: Dissolved Oxygen, Apparent Oxygen Utilization, and Oxygen Saturation. A Mishonov Technical Ed.; NOAA Atlas NESDIS 83, 38pp.
+
+Locarnini RA, Mishonov AV, Baranova OK, Boyer TP, Zweng MM, Garcia HE, Reagan JR, Seidov D, Weathers K, Paver CR, Smolyar I (2018). World Ocean Atlas 2018, Volume 1: Temperature. A. Mishonov Technical Ed.; NOAA Atlas NESDIS 81, 52pp.
+
+Nychka D, Furrer R, Paige J, Sain S (2021). “fields: Tools for spatial data.” R package version 13.3, <URL:
+https://github.com/dnychka/fieldsRPackage>.
+
+R Core Team (2017). R: A language and environment for statistical computing. R Foundation for Statistical Computing, Vienna, Austria. URL https://www.R-project.org/.
+
+Valdes PJ, Armstrong E, Badger MPS, Bradshaw CD, Bragg F, Crucifix M, Davies-Barnard T, Day JJ, Farnsworth A, Gordon C, Hopcroft PO, Kennedy AT, Lord NS, Lunt DJ, Marzocchi A, Parry LM, Pope V, Roberts WHG, Stone EJ, … Williams JHT. (2017). The BRIDGE HadCM3 family of climate models: HadCM3@Bristol v1.0. Geoscientific Model Development, 10(10), 3715–3743. DOI: 10.5194/gmd-10-3715-2017
