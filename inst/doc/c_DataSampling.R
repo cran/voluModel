@@ -28,7 +28,7 @@ library(rangeBuilder) # To compare marineBackground to getDynamicAlphaHull
 # Map occurrences
 land <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")[1]
 pointMap(occs = occurrences, ptCol = "orange", landCol = "black",
-             spName = "Steindachneria argentia", ptSize = 3,
+             spName = "Steindachneria argentea", ptSize = 3,
              land = land)
 
 ## ----alpha hull demonstration, message=FALSE, warning=FALSE, eval=FALSE-------
@@ -45,21 +45,6 @@ pointMap(occs = occurrences, ptCol = "orange", landCol = "black",
 
 ## ----plot alpha hull demonstration, echo=FALSE--------------------------------
 knitr::include_graphics("alphaHullDemonstration-1.png")
-
-## ----basic marineBackground demonstration, message=FALSE, warning=FALSE, eval=FALSE----
-#  trainingRegion <- marineBackground(occurrences,
-#                                  fraction = 1, partCount = 1,
-#                                  clipToOcean = F)
-#  plot(occurrences[,c("decimalLongitude", "decimalLatitude")],
-#       main = "Mimimum of 100% Points in Training Region,\nMaximum of 1 Polygon Permitted, Automatic Buffer",
-#       xlab = "Longitude", ylab = "Latitude",
-#       pch = 20, col = "red",
-#       xlim = c(-105, -40), ylim = c(0, 45))
-#  plot(land, col = "black", add = T)
-#  plot(trainingRegion, add = T, border = "orange", lwd = 2)
-
-## ----plot basic marineBackground demonstration, echo=FALSE--------------------
-knitr::include_graphics("basicMarineBackgroundDemonstration-1.png")
 
 ## ----clipToOcean demo, message=FALSE, warning=FALSE, eval=F-------------------
 #  trainingRegion <- marineBackground(occurrences,
@@ -170,7 +155,7 @@ print(paste0("Original number of points: ", nrow(occs), "; number of downsampled
 ## ----plot downsample----------------------------------------------------------
 pointCompMap(occs1 = occs, occs2 = occurrences, 
              occs1Name = "Original", occs2Name = "Cleaned", 
-             spName = "Steindachneria argentia", 
+             spName = "Steindachneria argentea", 
              land = rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")[1])
 
 ## ----temperature extraction---------------------------------------------------

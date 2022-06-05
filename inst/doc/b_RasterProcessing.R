@@ -103,7 +103,7 @@ plot(land, col = "black", add = T)
 #  # Change names to match temperature
 #  names(oxygen) <- envtNames
 
-## ----interpolate oxygen surface only, warning=FALSE---------------------------
+## ----interpolate oxygen surface only, echo = FALSE, warning=FALSE-------------
 # Creating a RasterBrick
 oxygen <- rasterFromXYZ(cbind(oxygen@coords, oxygen@data[["SURFACE"]]))
 

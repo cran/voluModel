@@ -1,3 +1,11 @@
+# voluModel 0.1.5
+
+- Addressed an error on some platforms when "buff" in marineBackground() was not specified.
+
+# voluModel 0.1.4
+
+- Updated metadata on funding source
+
 # voluModel 0.1.3
 
 - Adjust testing to comply with CRAN

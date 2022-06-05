@@ -75,7 +75,7 @@ head(occurrences)
 
 land <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")[1]
 pointMap(occs = occurrences, ptCol = "orange", landCol = "black",
-             spName = "Steindachneria argentia", ptSize = 3,
+             spName = "Steindachneria argentea", ptSize = 3,
              land = land)
 rm(indices, layerNames, tempPoints, i, downsampledOccs, occs)
 
@@ -155,7 +155,7 @@ oxyPlot <- ggplot(allOxy, aes(x=Group, y=Oxygen)) +
 gridExtra::grid.arrange(tempPlot, oxyPlot, nrow = 1)
 
 ## ----study region, message=FALSE, warning=FALSE-------------------------------
-studyRegion <- marineBackground(occurrences)
+studyRegion <- marineBackground(occurrences, buff = 1000000)
 plot(temperature[[1]], 
      main = "Points and background sampling plotted on surface temperature",
      col = viridis(n = 11, option = "mako"))
@@ -266,6 +266,7 @@ occurrences$index <- unlist(lapply(occurrences$depth,
                                      which.min(abs(layerNames - x))))
 indices <- sort(unique(occurrences$index))
 
-plotLayers(envelopeModel3D[[min(indices):max(indices)]], 
-          land = land)
+plotLayers(envelopeModel3D[[min(indices):max(indices)]],
+           title = "Envelope Model of Luminous Hake,\n 20 to 700m",
+           land = land)
 

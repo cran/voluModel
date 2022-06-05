@@ -81,11 +81,11 @@ print(paste0("Original number of points: ", nrow(occs), "; number of downsampled
 land <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")[1]
 pointCompMap(occs1 = occs, occs2 = occsClean, 
              occs1Name = "Original", occs2Name = "Cleaned", 
-             spName = "Steindachneria argentia", 
+             spName = "Steindachneria argentea", 
              land = land)
 
 ## ----environmental background sampling, warning=FALSE-------------------------
-backgroundSamplingRegions <- marineBackground(occsClean)
+backgroundSamplingRegions <- marineBackground(occsClean, buff = 1000000)
 plot(temperature[[1]], 
      main = "Points and background sampling plotted on surface temperature",
      col = viridis(n= 11, option = "mako"))
@@ -172,7 +172,8 @@ glmThresholded <- reclassify(glmThresholded, c(NA, NA, 0), include.lowest = T)
 
 ## ----thresholded glm niche model plotted--------------------------------------
 plotLayers(glmThresholded, 
-          land = land, landCol = "black")
+          land = land, landCol = "black",
+          title = "Areas of suitable habitat for \n Luminous Hake, 5m to 800m")
 
 ## ----calculate MESS, warning=FALSE--------------------------------------------
 # Prepare environmental data
@@ -191,7 +192,8 @@ messBrick <- MESS3D(calibration = datForMod, projection = projList)
 extrapolation <- 0 >= messBrick
 
 # Plot Extrapolation
-plotLayers(extrapolation, land = land, landCol = "black", title = "Areas of extrapolation according to MESS,\n 5m to 800m")
+plotLayers(extrapolation, land = land, landCol = "black", 
+           title = "Areas of extrapolation according to MESS,\n 5m to 800m")
 
 ## ----reclassify MESS and plot GLM with no extrapolation, warning=FALSE--------
 # Reclassify MESS 
