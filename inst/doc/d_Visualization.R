@@ -5,9 +5,11 @@ knitr::opts_knit$set(root.dir = system.file('extdata',
 
 library(voluModel) # Because of course
 library(ggplot2) # For fancy plotting
-library(rgdal) # For vector stuff. Will eventually be replaced with sf.
+library(rgdal, 
+        options("rgdal_show_exportToProj4_warnings"="none")) # For vector stuff. Will eventually be replaced with sf.
 library(raster) # For raster stuff. Will eventually be replaced with terra.
 library(viridisLite) # For high-contrast plotting palettes
+library(dplyr) # To filter data
 
 # Load data
 load(system.file("extdata/oxygenSmooth.RData", 
@@ -39,15 +41,8 @@ names(temperature) <- envtNames
 names(oxygenSmooth) <- names(temperature)
 
 # Clean points ----
-occsClean <- occs[complete.cases(occs$depth),]
-occsClean <- occsClean[occsClean$depth > 0.0,]
-occsClean <- occsClean[occsClean$depth < 2000.0,]
-
-occurrences <- occsClean[,c("decimalLatitude", "decimalLongitude", "depth")] 
-
-# Preliminary cleaning
-occurrences <- dplyr::distinct(occurrences)
-occurrences <- occurrences[complete.cases(occurrences),]
+occurrences <- occs %>% dplyr::select(decimalLongitude, decimalLatitude, depth) %>%
+  distinct() %>% filter(dplyr::between(depth, 1, 2000))
 
 # Gets the layer index for each occurrence by matching to depth
 layerNames <- as.numeric(gsub("[X]", "", names(temperature)))
@@ -101,7 +96,7 @@ rm(AOUpresence, downsampledOccs, occsClean, occurrences, temperaturePresence,
 #  library(viridisLite) # For high-contrast plotting palettes
 
 ## ----loading land data, warning=FALSE, message=FALSE--------------------------
-land <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")[1]
+land <- rnaturalearth::ne_countries(scale = "small", returnclass = "sf")[1]
 
 ## ----pointMap, warning=FALSE, message=FALSE-----------------------------------
 pointMap(occs = occs, land = land, landCol = "black", spName = "Steindachneria argentea", 

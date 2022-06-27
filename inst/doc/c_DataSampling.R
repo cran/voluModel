@@ -5,28 +5,26 @@ load(system.file("extdata/oxygenSmooth.RData",
 load(system.file("extdata/oxygenBottom.RData",
                  package = 'voluModel'))
 
-# Cleaning occurrences
-occs <- read.csv(system.file("extdata/Steindachneria_argentea.csv", 
-                             package='voluModel'))
-
-# Clean points
-occsClean <- occs[complete.cases(occs$depth),]
-occsClean <- occsClean[occsClean$depth > 0.0,]
-occsClean <- occsClean[occsClean$depth < 2000.0,]
-occurrences <- occsClean[,c("decimalLatitude", "decimalLongitude", "depth")] 
-occurrences <- dplyr::distinct(occurrences)
-occurrences <- occurrences[complete.cases(occurrences),]
-
 ## ----packages, message=FALSE, warning=FALSE-----------------------------------
 library(voluModel) # Because of course
 library(ggplot2) # For fancy plotting
-library(rgdal) # For vector stuff. Will eventually be replaced with sf.
+library(rgdal, 
+        options("rgdal_show_exportToProj4_warnings"="none")) # For vector stuff. Will eventually be replaced with sf.
 library(raster) # For raster stuff. Will eventually be replaced with terra.
 library(rangeBuilder) # To compare marineBackground to getDynamicAlphaHull
+library(dplyr) # To filter data
 
 ## ----occurrence dataset, message=FALSE, warning = FALSE-----------------------
+# Get points
+occs <- read.csv(system.file("extdata/Steindachneria_argentea.csv", 
+                             package='voluModel'))
+occurrences <- occs %>% 
+  dplyr::select(decimalLongitude, decimalLatitude, depth) %>%
+  dplyr::distinct() %>% 
+  dplyr::filter(dplyr::between(depth, 1, 2000))
+
 # Map occurrences
-land <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")[1]
+land <- rnaturalearth::ne_countries(scale = "small", returnclass = "sf")[1]
 pointMap(occs = occurrences, ptCol = "orange", landCol = "black",
              spName = "Steindachneria argentea", ptSize = 3,
              land = land)
@@ -43,15 +41,15 @@ pointMap(occs = occurrences, ptCol = "orange", landCol = "black",
 #  plot(land, col = "black", add = T)
 #  plot(trainingRegion, add = T, border = "orange", lwd = 2)
 
-## ----plot alpha hull demonstration, echo=FALSE--------------------------------
-knitr::include_graphics("alphaHullDemonstration-1.png")
+## ----plot alpha hull demonstration, echo=FALSE, fig.width=7-------------------
+knitr::include_graphics("alphaHullDemonstration-1.png", )
 
 ## ----clipToOcean demo, message=FALSE, warning=FALSE, eval=F-------------------
 #  trainingRegion <- marineBackground(occurrences,
-#                                  fraction = .95, partCount = 2, buff = 1000000,
-#                                  clipToOcean = T)
+#                                     buff = 1000000,
+#                                     clipToOcean = T)
 #  plot(occurrences[,c("decimalLongitude", "decimalLatitude")],
-#       main = "Minimum of 95% Points in Training Region,\nMaximum of 2 Polygons Permitted, 100 km Buffer",
+#       main = "100 km Buffer,\n Training Region Clipped to Occupied Polygon",
 #       xlab = "Longitude", ylab = "Latitude",
 #       pch = 20, col = "red",
 #       xlim = c(-105, -40), ylim = c(0, 45))
@@ -59,9 +57,8 @@ knitr::include_graphics("alphaHullDemonstration-1.png")
 #  plot(trainingRegion, add = T, border = "orange", lwd = 2)
 
 ## ----plot clipToOcean demo, echo=FALSE----------------------------------------
-trainingRegion <- marineBackground(occurrences, 
-                                fraction = .95, partCount = 2, buff = 1000000, 
-                                clipToOcean = T)
+trainingRegion <- readRDS(system.file("extdata/backgroundSamplingRegions.rds",
+                              package='voluModel'))
 
 knitr::include_graphics("clipToOceanDemo-1.png")
 
@@ -115,7 +112,7 @@ envtNames[[1]] <- "0"
 names(temperature) <- envtNames
 
 # Here's a sampling of depth plots from the 102 depth layers available
-plot(temperature[[c(1, 10, 50, 100)]])
+plot(temperature[[c(1, 50)]])
 
 ## ----column interpretations, message=TRUE, warning=TRUE-----------------------
 occsTest <- occurrences[1:5,]
@@ -123,18 +120,9 @@ xyzSample(occs = occsTest, envBrick = temperature)
 colnames(occsTest) <- c("x", "y", "z")
 xyzSample(occs = occsTest, envBrick = temperature)
 
-# Of course, the names have to be somewhat interpretable
-colnames(occsTest) <- c("ham", "eggs", "cheese")
-xyzSample(occs = occsTest, envBrick = temperature)
 rm(occsTest)
 
 ## ----downsample to voxel, eval=TRUE, warning=FALSE, message=FALSE-------------
-occurrences <- occsClean[,c("decimalLatitude", "decimalLongitude", "depth")] 
-
-# Preliminary cleaning
-occurrences <- dplyr::distinct(occurrences)
-occurrences <- occurrences[complete.cases(occurrences),]
-
 # Gets the layer index for each occurrence by matching to depth
 layerNames <- as.numeric(gsub("[X]", "", names(temperature)))
 occurrences$index <- unlist(lapply(occurrences$depth, FUN = function(x) which.min(abs(layerNames - x))))
@@ -152,11 +140,11 @@ head(occurrences)
 
 print(paste0("Original number of points: ", nrow(occs), "; number of downsampled occs: ", nrow(occurrences)))
 
-## ----plot downsample----------------------------------------------------------
+## ----plot downsample, warning=FALSE-------------------------------------------
 pointCompMap(occs1 = occs, occs2 = occurrences, 
              occs1Name = "Original", occs2Name = "Cleaned", 
              spName = "Steindachneria argentea", 
-             land = rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")[1])
+             land = land)
 
 ## ----temperature extraction---------------------------------------------------
 # Extraction

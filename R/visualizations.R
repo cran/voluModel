@@ -111,7 +111,7 @@ testIntersection <- function(a,b){
 #'                              package='voluModel'))
 #' spName <- "Steindachneria argentea"
 #' pointMap(occs = occs, spName = spName,
-#'          land = rnaturalearth::ne_countries(scale = "medium",
+#'          land = rnaturalearth::ne_countries(scale = "small",
 #'                                             returnclass = "sf")[1])
 #'
 #' @import ggplot2
@@ -282,12 +282,10 @@ pointMap <- function(occs, spName, land = NA,
 #'              landCol = "black",
 #'              waterCol = "steelblue",
 #'              spName = spName,
-#'              ptSize = 2,
-#'              land = rnaturalearth::ne_countries(scale = "medium",
-#'                                                 returnclass = "sf")[1])
+#'              ptSize = 2)
 #'
 #' @import ggplot2
-#' @importFrom dplyr inner_join anti_join
+#' @importFrom dplyr inner_join anti_join %>% mutate
 #' @importFrom ggtext element_markdown
 #'
 #' @seealso \code{\link[ggplot2:ggplot]{ggplot}}
@@ -384,13 +382,16 @@ pointCompMap <- function(occs1, occs2,
 
   # Where the function actually starts
   occsBoth <- NA
-  occsBoth <- unique(dplyr::inner_join(occs2[,c(xIndex2, yIndex2)],
-                                     occs1[,c(xIndex1, yIndex1)]))
-  occsBoth$source <- rep_len("both", length.out = nrow(occsBoth))
-  occs1 <- unique(dplyr::anti_join(occs1[,c(xIndex1, yIndex1)],occsBoth))
-  occs1$source <- rep_len(occs1Name, length.out = nrow(occs1))
-  occs2 <- unique(dplyr::anti_join(occs2[,c(xIndex2, yIndex2)],occsBoth))
-  occs2$source <- rep_len(occs2Name, length.out = nrow(occs2))
+  occsBoth <- dplyr::inner_join(occs2[,c(xIndex2, yIndex2)],
+                                occs1[,c(xIndex1, yIndex1)]) %>%
+    dplyr::distinct() %>%
+    dplyr::mutate(source = "both")
+  occs1 <- dplyr::anti_join(occs1[,c(xIndex1, yIndex1)],occsBoth) %>%
+    dplyr::distinct() %>%
+    dplyr::mutate(source = occs1Name)
+  occs2 <- dplyr::anti_join(occs2[,c(xIndex2, yIndex2)],occsBoth) %>%
+    dplyr::distinct() %>%
+    dplyr::mutate(source = occs2Name)
 
   colParse1 <- columnParse(occs1)
   xIndex1 <- colParse1$xIndex
@@ -839,10 +840,7 @@ diversityStack <- function(rasterList, template){
 #' rast <- raster(ncol=10, nrow=10)
 #' values(rast) <- seq(0,99, 1)
 #'
-#' oneRasterPlot(rast = rast,
-#'               land = rnaturalearth::ne_countries(scale = "medium",
-#'                                                  returnclass = "sf")[1],
-#'               landCol = "black")
+#' oneRasterPlot(rast = rast)
 #'
 #' @import raster
 #' @importFrom viridisLite viridis
@@ -862,7 +860,7 @@ oneRasterPlot <- function(rast,
   if("maxpixels" %in% names(args)){
     maxpixels <- args$maxpixels
   } else{
-    maxpixels <- 50000
+    maxpixels <- 10000
   }
 
   if("alpha" %in% names(args)){
@@ -987,7 +985,7 @@ plotLayers <- function(rast,
   if("maxpixels" %in% names(args)){
     maxpixels <- args$maxpixels
   } else{
-    maxpixels <- 50000
+    maxpixels <- 10000
   }
 
   # Input error checking

@@ -9,7 +9,8 @@ load(system.file("extdata/oxygenSmooth.RData",
 library(voluModel) # Because of course
 library(dplyr) # For occurrence data filtration
 library(ggplot2) # For fancy plotting
-library(rgdal) # For vector stuff. Will eventually be replaced with sf.
+library(rgdal,
+        options("rgdal_show_exportToProj4_warnings"="none")) # For vector stuff. Will eventually be replaced with sf.
 library(raster) # For raster stuff. Will eventually be replaced with terra.
 library(viridisLite) # For high-contrast plotting palettes
 
@@ -20,8 +21,10 @@ summary(occs$depth)
 boxplot.stats(occs$depth)
 
 ## ----clean occurrence data, eval=T--------------------------------------------
-occsClean <- occs %>% dplyr::select(decimalLongitude, decimalLatitude, depth) %>%
-  distinct() %>% filter(depth %in% 1:2000)
+occsClean <- occs %>% 
+  dplyr::select(decimalLongitude, decimalLatitude, depth) %>%
+  dplyr::distinct() %>% 
+  filter(dplyr::between(depth, 1, 2000))
 head(occsClean)
 
 ggplot(occsClean, aes(x = 1, y=depth)) +
@@ -78,20 +81,24 @@ for(i in indices){
 occsClean <- downsampledOccs
 
 print(paste0("Original number of points: ", nrow(occs), "; number of downsampled occs: ", nrow(occsClean)))
-land <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")[1]
+land <- rnaturalearth::ne_countries(scale = "small", returnclass = "sf")[1]
 pointCompMap(occs1 = occs, occs2 = occsClean, 
              occs1Name = "Original", occs2Name = "Cleaned", 
              spName = "Steindachneria argentea", 
              land = land)
 
-## ----environmental background sampling, warning=FALSE-------------------------
-backgroundSamplingRegions <- marineBackground(occsClean, buff = 1000000)
-plot(temperature[[1]], 
-     main = "Points and background sampling plotted on surface temperature",
-     col = viridis(n= 11, option = "mako"))
-plot(backgroundSamplingRegions, add = T, border = "orange", lwd = 2)
-points(occsClean[,c("decimalLongitude","decimalLatitude")], 
-       cex = 1, pch = 20, col = "red")
+## ----environmental background sampling, warning=FALSE, eval = FALSE-----------
+#  backgroundSamplingRegions <- marineBackground(occsClean, buff = 1000000)
+#  plot(temperature[[1]],
+#       main = "Points and background sampling plotted on surface temperature",
+#       col = viridis(n= 11, option = "mako"))
+#  plot(backgroundSamplingRegions, add = T, border = "orange", lwd = 2)
+#  points(occsClean[,c("decimalLongitude","decimalLatitude")],
+#         cex = 1, pch = 20, col = "red")
+
+## ----environmental background sampling hidden, warning=FALSE, echo=FALSE------
+backgroundSamplingRegions <- readRDS(system.file("extdata/backgroundSamplingRegions.rds",
+                              package='voluModel'))
 
 ## ----presence sampling--------------------------------------------------------
 # Presences
