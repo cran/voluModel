@@ -45,6 +45,10 @@ test_that("marineBackground input warnings behave as expected", {
                                   partCount = 3, buff = 10000,
                                   initialAlpha = 3, alphaIncrement = 1,
                                   clipToCoast = 1))
+  expect_warning(marineBackground(occs = occurrences, fraction = 0.95,
+                                  partCount = 3, buff = 10000,
+                                  initialAlpha = 3, alphaIncrement = 1,
+                                  clipToCoast = 1, verbose = "rabbit"))
 })
 
 test_that("marineBackground results as expected", {
@@ -83,7 +87,8 @@ test_that("marineBackground Pacific results as expected", {
 
   #One side
   result <- marineBackground(occs = occurrences[1:10,], buff = 1000000,
-                             fraction = .95, partCount = 2, clipToOcean = TRUE)
+                             fraction = .95, partCount = 2, clipToOcean = TRUE,
+                             verbose = FALSE)
   expect_equal(class(result)[[1]], "SpatialPolygons")
   expect_equal(length(result@polygons), 1)
 })

@@ -33,6 +33,9 @@
 #' peninsulas (e.g. Isthmus of Panama). Can be quite artificial at ocean
 #' boundaries.
 #'
+#' @param verbose `logical`. Switching to `FALSE` mutes message describing
+#' which columns in `occs` are interpreted as x and y coordinates.
+#'
 #' @param ... Additional optional arguments to pass to
 #' `getDynamicAlphaHull`.
 #'
@@ -41,7 +44,7 @@
 #' input data into this format.
 #'
 #' @details The meat of this function is a special-case wrapper
-#' around `getDynamicAlphaHull` from the `rangeBuilder` package.
+#' around `getDynamicAlphaHull()` from the `rangeBuilder` package.
 #' The function documented here is especially useful in cases where
 #' one wants to automatically generate training regions that overlap
 #' the international date line. Regions that exceed the line are cut
@@ -51,6 +54,10 @@
 #' If the argument `buff` is not supplied, a buffer is
 #' calculated by taking the mean between the 10th and 90th percentile
 #' of horizontal distances between occurrence points.
+#'
+#' If `getDynamicAlphaHull()` cannot satisfy the provided conditions,
+#' the occurrences are buffered and then a minimum convex hull is
+#' drawn around the buffer polygons.
 #'
 #' @examples
 #' \donttest{
@@ -77,7 +84,7 @@
 #' @import rangeBuilder
 #' @import rgeos
 #' @import sp
-#' @importFrom terra distance buffer shift
+#' @importFrom terra distance buffer shift vect
 #' @importFrom methods as slot<-
 #'
 #' @seealso \code{\link[rangeBuilder:getDynamicAlphaHull]{getDynamicAlphaHull}}
@@ -87,7 +94,7 @@
 #' @export
 
 
-marineBackground <- function(occs, clipToOcean = TRUE, ...){
+marineBackground <- function(occs, clipToOcean = TRUE, verbose = TRUE, ...){
   args <- list(...)
 
   if("fraction" %in% names(args)){
@@ -129,6 +136,10 @@ marineBackground <- function(occs, clipToOcean = TRUE, ...){
     warning(message("Argument 'clipToOcean' is not of type 'logical'.\n"))
     return(NULL)
   }
+  if (!is.logical(verbose)) {
+    warning(message("Argument 'verbose' is not of type 'logical'.\n"))
+    return(NULL)
+  }
   if (!is.numeric(fraction)) {
     warning(message("Argument 'fraction' is not of class 'numeric'.\n"))
     return(NULL)
@@ -148,7 +159,9 @@ marineBackground <- function(occs, clipToOcean = TRUE, ...){
   yIndex <- colParse$yIndex
   interp <- colParse$reportMessage
 
-  message(interp)
+  if(verbose){
+    message(interp)
+  }
 
   # Calculate buffer
   if("buff" %in% names(args)){
@@ -175,6 +188,14 @@ marineBackground <- function(occs, clipToOcean = TRUE, ...){
     return(NULL)
   }
 
+  # Point part
+  occsForM <- suppressWarnings(sp::SpatialPoints(occs[,c(xIndex, yIndex)],
+                                                 proj4string = sp::CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")))
+  occsForM <- sp::spTransform(occsForM,
+                              CRSobj = sp::CRS("+proj=eqc +lon_0=0 +datum=WGS84 +units=m +no_defs"))
+  occBuff <- suppressWarnings(terra::buffer(occsForM,
+                                            width = buff, dissolve = TRUE))
+
   # Hull part
   hull <- try(rangeBuilder::getDynamicAlphaHull(occs,
                                                 initialAlpha = initialAlpha,
@@ -185,6 +206,7 @@ marineBackground <- function(occs, clipToOcean = TRUE, ...){
                                                 fraction = fraction,
                                                 partCount = partCount),
               silent = TRUE)
+  gdahFail <- FALSE
   if("try-error" %in% class(hull)){
     x1 <- min(occs[xIndex])
     x2 <- max(occs[xIndex])
@@ -197,20 +219,26 @@ marineBackground <- function(occs, clipToOcean = TRUE, ...){
     hull <- sp::spTransform(hull,
                             CRSobj = sp::CRS("+proj=eqc +lon_0=0 +datum=WGS84 +units=m +no_defs"))
   } else{
+    if(hull$alpha == "alphaMCH"){
+      gdahFail <- TRUE
+    }
     hull <- sp::spTransform(hull[[1]],
                             CRSobj = sp::CRS("+proj=eqc +lon_0=0 +datum=WGS84 +units=m +no_defs"))
   }
 
-  hullBuff <- terra::buffer(hull, width = buff, dissolve = TRUE)
-
-  # Point part
-  occsForM <- suppressWarnings(sp::SpatialPoints(occs[,c(xIndex, yIndex)],
-                                                 proj4string = sp::CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")))
-  occsForM <- sp::spTransform(occsForM,
-                              CRSobj = sp::CRS("+proj=eqc +lon_0=0 +datum=WGS84 +units=m +no_defs"))
-  occBuff <- suppressWarnings(terra::buffer(occsForM,
-                                            width = buff, dissolve = TRUE))
-  wholeM <- rgeos::gUnion(occBuff, hullBuff)
+  if(gdahFail){
+    occBuffTmp <- terra::disagg(terra::vect(occBuff))
+    occBuffConv <- vector(mode = "list", length = length(occBuffTmp))
+    for (i in 1:length(occBuffTmp)){
+      occBuffConv[[i]] <- terra::convHull(occBuffTmp[i])
+      values(occBuffConv[[i]]) <- 1
+    }
+    wholeM <- vect(occBuffConv)
+    wholeM <- as(wholeM, "Spatial")
+  } else{
+    hullBuff <- terra::buffer(hull, width = buff, dissolve = TRUE)
+    wholeM <- rgeos::gUnion(occBuff, hullBuff)
+  }
 
   # Crop out land
   land <- readRDS(system.file("extdata/smallLand.rds",

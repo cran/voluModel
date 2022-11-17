@@ -1,9 +1,5 @@
 ## ----setup, include=FALSE-----------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE, error = FALSE, fig.retina = 1, dpi = 80)
-load(system.file("extdata/oxygenSmooth.RData", 
-                 package='voluModel'))
-load(system.file("extdata/oxygenBottom.RData",
-                 package = 'voluModel'))
 
 ## ----packages, message=FALSE, warning=FALSE-----------------------------------
 library(voluModel) # Because of course
@@ -12,9 +8,39 @@ library(ggplot2) # For fancy plotting
 library(rgdal, 
         options("rgdal_show_exportToProj4_warnings"="none")) # For vector stuff. Will eventually be replaced with sf.
 library(raster) # For raster stuff. Will eventually be replaced with terra.
-library(viridisLite) # For high-contrast plotting palettes
+library(lattice) # For plotting
 
-## ----loading data, message=FALSE, warning=FALSE, include=FALSE----------------
+## ----show points, warning=FALSE, echo=TRUE, message=FALSE, eval=FALSE---------
+#  occs <- read.csv(system.file("extdata/Steindachneria_argentea.csv",
+#                               package='voluModel'))
+#  
+#  # Filter points
+#  occurrences <- occs %>%
+#    dplyr::select(decimalLongitude, decimalLatitude, depth) %>%
+#    dplyr::distinct() %>%
+#    dplyr::filter(dplyr::between(depth, 1, 2000))
+#  
+#  head(occurrences)
+#  land <- rnaturalearth::ne_countries(scale = "small", returnclass = "sf")[1]
+#  pointMap(occs = occurrences, ptCol = "orange", landCol = "black",
+#               spName = "Steindachneria argentea", ptSize = 3,
+#               land = land)
+
+## ----point plot, echo=FALSE, out.width = '100%', out.height= '100%'-----------
+occs <- read.csv(system.file("extdata/Steindachneria_argentea.csv", 
+                             package='voluModel'))
+
+# Filter points
+occurrences <- occs %>% 
+  dplyr::select(decimalLongitude, decimalLatitude, depth) %>%
+  dplyr::distinct() %>% 
+  dplyr::filter(dplyr::between(depth, 1, 2000))
+
+head(occurrences)
+land <- rnaturalearth::ne_countries(scale = "small", returnclass = "sf")[1]
+knitr::include_graphics("pointMap.png")
+
+## ----loading data, message=FALSE, warning=FALSE, include=TRUE-----------------
 # Temperature
 td <- tempdir()
 unzip(system.file("extdata/woa18_decav_t00mn01_cropped.zip", 
@@ -38,45 +64,14 @@ envtNames <- gsub("[d,M]", "", names(temperature))
 envtNames[[1]] <- "0"
 names(temperature) <- envtNames
 
-# Oxygen processing
+# Oxygen processing, pre-baked to save time
+load(system.file("extdata/oxygenSmooth.RData", 
+                 package='voluModel'))
+load(system.file("extdata/oxygenBottom.RData",
+                 package = 'voluModel'))
 names(oxygenSmooth) <- names(temperature)
 
-# Points
-occs <- read.csv(system.file("extdata/Steindachneria_argentea.csv", 
-                             package='voluModel'))
-
-#Clean points
-occurrences <- occs %>% 
-  dplyr::select(decimalLongitude, decimalLatitude, depth) %>%
-  dplyr::distinct() %>% 
-  dplyr::filter(dplyr::between(depth, 1, 2000))
-
-# Gets the layer index for each occurrence by matching to depth
-layerNames <- as.numeric(gsub("[X]", "", names(temperature)))
-occurrences$index <- unlist(lapply(occurrences$depth, FUN = function(x) which.min(abs(layerNames - x))))
-indices <- unique(occurrences$index)
-downsampledOccs <- data.frame()
-for(i in indices){
-  tempPoints <- occurrences[occurrences$index==i,]
-  tempPoints <- downsample(tempPoints, temperature[[1]])
-  tempPoints$depth <- rep(layerNames[[i]], times = nrow(tempPoints))
-  downsampledOccs <- rbind(downsampledOccs, tempPoints)
-}
-occurrences <- occurrences[,c("decimalLatitude", "decimalLongitude", "depth")] 
-
-## ----show points, warning=FALSE, echo=FALSE, message=FALSE--------------------
-head(occurrences)
-
-land <- rnaturalearth::ne_countries(scale = "small", returnclass = "sf")[1]
-pointMap(occs = occurrences, ptCol = "orange", landCol = "black",
-             spName = "Steindachneria argentea", ptSize = 3,
-             land = land)
-rm(indices, layerNames, tempPoints, i, downsampledOccs, occs)
-
-## ----temperature plot, echo=FALSE, out.width = '100%', out.height= '100%'-----
-knitr::include_graphics("TemperatureTopBottom.png")
-
-## ----oxygen plotting, echo=FALSE, eval = FALSE, message=FALSE, warning=FALSE----
+## ----oxygen plotting, echo=TRUE, eval = FALSE, message=FALSE, warning=FALSE----
 #  p3 <- oneRasterPlot(oxygenSmooth[[1]], land = land, landCol = "black",
 #                title= "Apparent Oxygen Utilization (µmol/kg),\n interpolated and smoothed")
 #  p4 <- oneRasterPlot(oxygenBottom, land = land, landCol = "black",
@@ -88,25 +83,43 @@ knitr::include_graphics("TemperatureTopBottom.png")
 #                               fg = "white",
 #                               par.strip.text = list(col = "white", cex = 1.2, font = 2)))
 
+## ----temperature plot, echo=FALSE, out.width = '100%', out.height= '100%'-----
+knitr::include_graphics("TemperatureTopBottom.png")
+
 ## ----oxygen plot, echo=FALSE, out.width = '100%', out.height= '100%'----------
 knitr::include_graphics("OxygenTopBottom.png")
+
+## ----occurrence and depth matchup---------------------------------------------
+# Gets the layer index for each occurrence by matching to depth
+layerNames <- as.numeric(gsub("[X]", "", names(temperature)))
+occurrences$index <- unlist(lapply(occurrences$depth, FUN = function(x) which.min(abs(layerNames - x))))
+indices <- unique(occurrences$index)
+downsampledOccs <- data.frame()
+for(i in indices){
+  tempPoints <- occurrences[occurrences$index==i,]
+  tempPoints <- downsample(tempPoints, temperature[[1]], verbose = FALSE)
+  tempPoints$depth <- rep(layerNames[[i]], times = nrow(tempPoints))
+  downsampledOccs <- rbind(downsampledOccs, tempPoints)
+}
+occurrences <- occurrences[,c("decimalLatitude", "decimalLongitude", "depth")]
+rm(indices, layerNames, tempPoints, i, downsampledOccs, occs)
 
 ## ----data extraction, echo=FALSE, message=FALSE, warning=FALSE----------------
 # Extract temperature
 threeDimTemp <- xyzSample(occs = occurrences, temperature)
-threeDimTemp <- cbind(rep("3D", length(threeDimTemp)), threeDimTemp)
+threeDimTemp <- cbind(rep("X, Y,\nZ", length(threeDimTemp)), threeDimTemp)
 surfTemp <- extract(x = temperature[[1]], occurrences[,c("decimalLongitude", "decimalLatitude")])
-surfTemp <- cbind(rep("Surface", length(surfTemp)), surfTemp)
+surfTemp <- cbind(rep("X, Y,\nSurface", length(surfTemp)), surfTemp)
 bottomTemp <- extract(x = temperatureBottom, occurrences[,c("decimalLongitude", "decimalLatitude")])
-bottomTemp <- cbind(rep("Bottom", length(bottomTemp)), bottomTemp)
+bottomTemp <- cbind(rep("X, Y,\nBottom", length(bottomTemp)), bottomTemp)
 
 # Extract AOU
 threeDimOxy <- xyzSample(occs = occurrences, oxygenSmooth)
-threeDimOxy <- cbind(rep("3D", length(threeDimOxy)), threeDimOxy)
+threeDimOxy <- cbind(rep("X, Y,\nZ", length(threeDimOxy)), threeDimOxy)
 surfOxy <- extract(x = oxygenSmooth[[1]], occurrences[,c("decimalLongitude", "decimalLatitude")])
-surfOxy <- cbind(rep("Surface", length(surfOxy)), surfOxy)
+surfOxy <- cbind(rep("X, Y,\nSurface", length(surfOxy)), surfOxy)
 bottomOxy <- extract(x = oxygenBottom, occurrences[,c("decimalLongitude", "decimalLatitude")])
-bottomOxy <- cbind(rep("Bottom", length(bottomOxy)), bottomOxy)
+bottomOxy <- cbind(rep("X, Y,\nBottom", length(bottomOxy)), bottomOxy)
 
 ## ----temperature violin plots, echo=FALSE, message=FALSE, warning=FALSE-------
 # Collation
@@ -123,9 +136,9 @@ allOxy <- allOxy[complete.cases(allOxy),]
 allOxy$Oxygen <- as.numeric(allOxy$Oxygen)
 
 # Plotting
-groups <- c("Surface", "Bottom", "3D")
+groups <- c("X, Y,\nSurface", "X, Y,\nBottom", "X, Y,\nZ")
 tempPlot <- ggplot(allTemp, aes(x=Group, y=Temperature)) + 
-  geom_boxplot(fill="#9C179EFF", notch = T) +
+  geom_boxplot(fill="#b2182b", notch = T) +
   theme_classic(base_size = 15) +
   theme(axis.title.x = element_blank(), 
         text = element_text(family = "Arial"), 
@@ -134,7 +147,7 @@ tempPlot <- ggplot(allTemp, aes(x=Group, y=Temperature)) +
   ylab("Temperature (C)")
 
 oxyPlot <- ggplot(allOxy, aes(x=Group, y=Oxygen)) + 
-  geom_boxplot(fill="#ED7953FF", notch = T) +
+  geom_boxplot(fill="#2166ac", notch = T) +
   theme_classic(base_size = 15) +
   theme(axis.title.x = element_blank(), 
         text = element_text(family = "Arial"), 
@@ -146,12 +159,12 @@ gridExtra::grid.arrange(tempPlot, oxyPlot, nrow = 1)
 
 ## ----study region, message=FALSE, warning=FALSE, eval=FALSE-------------------
 #  studyRegion <- marineBackground(occurrences, buff = 1000000)
-#  plot(temperature[[1]],
-#       main = "Points and background sampling\nplotted on surface temperature",
-#       col = viridis(n = 11, option = "mako"))
-#  plot(studyRegion, add = T, border = "orange", lwd = 2)
-#  points(occurrences[,c("decimalLongitude","decimalLatitude")],
-#         cex = 1, pch = 20, col = "red")
+#  plot(studyRegion, border = F, col = "gray",
+#       main = "Points and Background Sampling",
+#       axes = T)
+#  plot(land, col = "black", add = T)
+#  points(occurrences[,c("decimalLongitude", "decimalLatitude")],
+#         pch = 20, col = "red", cex = 1.5)
 
 ## ----study region hidden, message=FALSE, warning=FALSE, eval=TRUE, echo=FALSE----
 studyRegion <- readRDS(system.file("extdata/backgroundSamplingRegions.rds",
@@ -230,7 +243,8 @@ envelopeModelBottom <- mask(crop(envelopeModelBottom, studyRegion), mask = study
 
 ## ----comparing 2D maps--------------------------------------------------------
 rasterComp(rast1 = envelopeModelSurface, rast2 = envelopeModelBottom, 
-           rast1Name = "Surface", rast2Name = "Bottom", land = land, landCol = "black", 
+           rast1Name = "Surface", rast2Name = "Bottom", 
+           land = land, landCol = "black", 
            title = "Comparison between surface and bottom envelope models")
 
 ## ----generate 3D envelope model-----------------------------------------------

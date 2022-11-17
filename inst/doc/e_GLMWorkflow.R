@@ -14,13 +14,13 @@ library(rgdal,
 library(raster) # For raster stuff. Will eventually be replaced with terra.
 library(viridisLite) # For high-contrast plotting palettes
 
-## ----occurrence data, eval=T--------------------------------------------------
+## ----occurrence data, eval=TRUE-----------------------------------------------
 occs <- read.csv(system.file("extdata/Steindachneria_argentea.csv", 
                              package='voluModel'))
 summary(occs$depth)
 boxplot.stats(occs$depth)
 
-## ----clean occurrence data, eval=T--------------------------------------------
+## ----clean occurrence data, eval=TRUE-----------------------------------------
 occsClean <- occs %>% 
   dplyr::select(decimalLongitude, decimalLatitude, depth) %>%
   dplyr::distinct() %>% 
@@ -73,7 +73,8 @@ indices <- unique(occsClean$index)
 downsampledOccs <- data.frame()
 for(i in indices){
   tempPoints <- occsClean[occsClean$index==i,]
-  tempPoints <- downsample(tempPoints, temperature[[1]])
+  tempPoints <- downsample(tempPoints, temperature[[1]], 
+                           verbose = FALSE)
   tempPoints$depth <- rep(layerNames[[i]], times = nrow(tempPoints))
   downsampledOccs <- rbind(downsampledOccs, tempPoints)
 }
@@ -85,20 +86,23 @@ land <- rnaturalearth::ne_countries(scale = "small", returnclass = "sf")[1]
 pointCompMap(occs1 = occs, occs2 = occsClean, 
              occs1Name = "Original", occs2Name = "Cleaned", 
              spName = "Steindachneria argentea", 
-             land = land)
+             land = land, verbose = FALSE)
 
 ## ----environmental background sampling, warning=FALSE, eval = FALSE-----------
 #  backgroundSamplingRegions <- marineBackground(occsClean, buff = 1000000)
-#  plot(temperature[[1]],
-#       main = "Points and background sampling plotted on surface temperature",
-#       col = viridis(n= 11, option = "mako"))
-#  plot(backgroundSamplingRegions, add = T, border = "orange", lwd = 2)
-#  points(occsClean[,c("decimalLongitude","decimalLatitude")],
-#         cex = 1, pch = 20, col = "red")
+#  plot(backgroundSamplingRegions, border = F, col = "gray",
+#       main = "Points and Background Sampling",
+#       axes = T)
+#  plot(land, col = "black", add = T)
+#  points(occurrences[,c("decimalLongitude", "decimalLatitude")],
+#         pch = 20, col = "red", cex = 1.5)
 
 ## ----environmental background sampling hidden, warning=FALSE, echo=FALSE------
 backgroundSamplingRegions <- readRDS(system.file("extdata/backgroundSamplingRegions.rds",
                               package='voluModel'))
+
+## ----plot study region plot, echo=FALSE, out.width = '100%', out.height= '100%'----
+knitr::include_graphics("PointsAndTrainingRegion.png")
 
 ## ----presence sampling--------------------------------------------------------
 # Presences

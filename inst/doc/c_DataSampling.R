@@ -29,17 +29,20 @@ pointMap(occs = occurrences, ptCol = "orange", landCol = "black",
              spName = "Steindachneria argentea", ptSize = 3,
              land = land)
 
+## ----point plot, echo=FALSE, out.width = '100%', out.height= '100%'-----------
+land <- rnaturalearth::ne_countries(scale = "small", returnclass = "sf")[1]
+knitr::include_graphics("pointMap.png")
+
 ## ----alpha hull demonstration, message=FALSE, warning=FALSE, eval=FALSE-------
 #  trainingRegion <- marineBackground(occurrences,
 #                                  fraction = 1, partCount = 1, buff = 1000000,
 #                                  clipToOcean = F)
-#  plot(occurrences[,c("decimalLongitude", "decimalLatitude")],
+#  plot(trainingRegion, border = F, col = "gray",
 #       main = "Mimimum of 100% Points in Training Region,\nMaximum of 1 Polygon Permitted, 100 km Buffer",
-#       xlab = "Longitude", ylab = "Latitude",
-#       pch = 20, col = "red",
-#       xlim = c(-105, -40), ylim = c(0, 45))
+#       axes = T)
 #  plot(land, col = "black", add = T)
-#  plot(trainingRegion, add = T, border = "orange", lwd = 2)
+#  points(occurrences[,c("decimalLongitude", "decimalLatitude")],
+#         pch = 20, col = "red", cex = 1.5)
 
 ## ----plot alpha hull demonstration, echo=FALSE, fig.width=7-------------------
 knitr::include_graphics("alphaHullDemonstration-1.png", )
@@ -48,13 +51,12 @@ knitr::include_graphics("alphaHullDemonstration-1.png", )
 #  trainingRegion <- marineBackground(occurrences,
 #                                     buff = 1000000,
 #                                     clipToOcean = T)
-#  plot(occurrences[,c("decimalLongitude", "decimalLatitude")],
+#  plot(trainingRegion, border = F, col = "gray",
 #       main = "100 km Buffer,\n Training Region Clipped to Occupied Polygon",
-#       xlab = "Longitude", ylab = "Latitude",
-#       pch = 20, col = "red",
-#       xlim = c(-105, -40), ylim = c(0, 45))
+#       axes = T)
 #  plot(land, col = "black", add = T)
-#  plot(trainingRegion, add = T, border = "orange", lwd = 2)
+#  points(occurrences[,c("decimalLongitude", "decimalLatitude")],
+#         pch = 20, col = "red", cex = 1.5)
 
 ## ----plot clipToOcean demo, echo=FALSE----------------------------------------
 trainingRegion <- readRDS(system.file("extdata/backgroundSamplingRegions.rds",
@@ -74,15 +76,14 @@ knitr::include_graphics("clipToOceanDemo-1.png")
 #  
 #  # marine Background
 #  pacificTrainingRegion <- marineBackground(pacificOccs,
-#                                            fraction = 1, partCount = 2,
+#                                            fraction = 0.95, partCount = 3,
 #                                            clipToOcean = T)
-#  plot(pacificOccs[,c("decimalLongitude", "decimalLatitude")],
+#  plot(pacificTrainingRegion, border = F, col = "gray",
 #       main = "marineBackground Antimeridian Wrap",
-#       xlab = "Longitude", ylab = "Latitude",
-#       ylim = c(-40,60),
-#       pch = 20, col = "red")
+#       axes = T)
 #  plot(land, col = "black", add = T)
-#  plot(pacificTrainingRegion, add = T, border = "orange", lwd = 2)
+#  points(pacificOccs[,c("decimalLongitude", "decimalLatitude")],
+#         pch = 20, col = "red", cex = 1.5)
 
 ## ----plot meridian wrap demo, echo=FALSE--------------------------------------
 knitr::include_graphics("meridianWrapDemo-1.png")
@@ -144,7 +145,7 @@ print(paste0("Original number of points: ", nrow(occs), "; number of downsampled
 pointCompMap(occs1 = occs, occs2 = occurrences, 
              occs1Name = "Original", occs2Name = "Cleaned", 
              spName = "Steindachneria argentea", 
-             land = land)
+             land = land, verbose = FALSE)
 
 ## ----temperature extraction---------------------------------------------------
 # Extraction
@@ -164,10 +165,12 @@ backgroundVals <- mSampling3D(occs = occurrences,
                               depthLimit = c(50, 1500))
 backgroundVals$temperature <- xyzSample(occs = backgroundVals, temperature)
 
+#Remove incomplete cases
+backgroundVals <- backgroundVals[complete.cases(backgroundVals),]
+
 ## -----------------------------------------------------------------------------
 # Add "response" column for modeling
 backgroundVals$response <- rep(0, times = nrow(backgroundVals))
-backgroundVals <- backgroundVals[complete.cases(backgroundVals),]
 
 head(backgroundVals)
 

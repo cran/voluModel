@@ -11,6 +11,10 @@
 #' one environmental variable. Each layer represents
 #' a depth slice. See Details for more information.
 #'
+#' @param verbose `logical`. Switching to `FALSE` mutes message describing
+#' which columns in `occs1` and `occs2` are interpreted as x, y, and z
+#' coordinates.
+#'
 #' @details The `envBrick` `rasterBrick` object should
 #' have numeric names that correspond with the beginning
 #' depth of a particular depth slice. For example, one
@@ -58,12 +62,13 @@
 #' occurrences$envtValue <- occSample3d
 #'
 #' @import raster
+#' @importFrom terra rast extract
 #'
 #' @keywords dataPrep
 #'
 #' @export
 
-xyzSample <- function(occs, envBrick){
+xyzSample <- function(occs, envBrick, verbose = TRUE){
   if(!is.data.frame(occs)){
     warning(paste0("'occs' must be an object of class 'data.frame'.\n"))
     return(NULL)
@@ -79,6 +84,13 @@ xyzSample <- function(occs, envBrick){
     return(NULL)
   }
 
+  envBrick <- rast(envBrick)
+
+  if (!is.logical(verbose)) {
+    warning(message("Argument 'verbose' is not of type 'logical'.\n"))
+    return(NULL)
+  }
+
   # Parse columns
   colNames <- colnames(occs)
   colParse <- columnParse(occs, wDepth = TRUE)
@@ -90,7 +102,9 @@ xyzSample <- function(occs, envBrick){
   zIndex <- colParse$zIndex
   interp <- colParse$reportMessage
 
-  message(interp)
+  if(verbose){
+    message(interp)
+  }
 
   # Checking for appropriate environmental layer names
   layerNames <- as.numeric(gsub("[X]", "", names(envBrick)))
@@ -110,9 +124,9 @@ xyzSample <- function(occs, envBrick){
   occs$sampledValues <- rep(NA, times = nrow(occs))
   indices <- unique(occs$index)
   for(i in indices){
-    occs[occs$index == i,]$sampledValues <- raster::extract(x = envBrick[[i]],
-                                                            y = occs[occs$index == i,c(xIndex,
-                                                                                       yIndex)])
+    occs[occs$index == i,]$sampledValues <- terra::extract(x = envBrick[[i]],
+                                                           y = occs[occs$index == i,c(xIndex,
+                                                                                      yIndex)])[,2]
   }
   return(occs$sampledValues)
 }

@@ -101,6 +101,9 @@ testIntersection <- function(a,b){
 #' @param ptSize `numeric` value for `cex`;
 #' size of occurrence points on map.
 #'
+#' @param verbose `logical`. Switching to `FALSE` mutes message describing
+#' which columns in `occs` are interpreted as x and y coordinates.
+#'
 #' @param ... Additional optional arguments to pass to
 #' `ggplot` initial plot object.
 #'
@@ -124,6 +127,7 @@ testIntersection <- function(a,b){
 pointMap <- function(occs, spName, land = NA,
                      ptCol = "#bd0026", landCol = "gray",
                      waterCol = "steelblue", ptSize = 1,
+                     verbose = TRUE,
                      ...){
   args <- list(...)
 
@@ -137,6 +141,11 @@ pointMap <- function(occs, spName, land = NA,
     alpha <- args$alpha
   } else{
     alpha <- 2/3
+  }
+
+  if (!is.logical(verbose)) {
+    warning(message("Argument 'verbose' is not of type 'logical'.\n"))
+    return(NULL)
   }
 
   # Input checking
@@ -178,7 +187,9 @@ pointMap <- function(occs, spName, land = NA,
   yIndex <- colParse$yIndex
   interp <- colParse$reportMessage
 
-  message(interp)
+  if(verbose){
+    message(interp)
+  }
 
   # Where the actual function happens
   if(any(is.na(land))){
@@ -253,6 +264,9 @@ pointMap <- function(occs, spName, land = NA,
 #' @param ptSize `numeric` value for `cex`;
 #' size of occurrence points on map.
 #'
+#' @param verbose `logical`. Switching to `FALSE` mutes message describing
+#' which columns in `occs1` and `occs2` are interpreted as x and y coordinates.
+#'
 #' @param ... Additional optional arguments to pass to
 #' `ggplot` initial plot object.
 #'
@@ -262,27 +276,26 @@ pointMap <- function(occs, spName, land = NA,
 #' must match.
 #'
 #' @examples
-#' occs <- read.csv(system.file("extdata/Steindachneria_argentea.csv",
-#'                              package='voluModel'))
+#' set.seed(5)
+#' occs <- data.frame(cbind(decimalLatitude = sample(seq(7,35), 24),
+#'                          decimalLongitude = sample(seq(-97, -70), 24)))
+#'
 #' set.seed(0)
 #' occs1 <- occs[sample(1:nrow(occs),
-#'                      size = 24, replace = FALSE),]
+#'                      size = 12, replace = FALSE),]
 #' set.seed(10)
 #' occs2 <- occs[sample(1:nrow(occs),
-#'                      size = 24, replace = FALSE),]
-#'
-#' spName <- "Steindachneria argentea"
-#'
+#'                      size = 12, replace = FALSE),]
 #'
 #' pointCompMap(occs1 = occs1, occs2 = occs2,
 #'              occs1Col = "red", occs2Col = "orange",
 #'              agreeCol = "purple",
 #'              occs1Name = "2D",
 #'              occs2Name = "3D",
-#'              landCol = "black",
 #'              waterCol = "steelblue",
-#'              spName = spName,
-#'              ptSize = 2)
+#'              spName = "Steindachneria argentea",
+#'              ptSize = 2,
+#'              verbose = FALSE)
 #'
 #' @import ggplot2
 #' @importFrom dplyr inner_join anti_join %>% mutate
@@ -303,6 +316,7 @@ pointCompMap <- function(occs1, occs2,
                          landCol = "gray",
                          waterCol = "steelblue",
                          ptSize = 1,
+                         verbose = TRUE,
                          ...){
   args <- list(...)
 
@@ -336,6 +350,11 @@ pointCompMap <- function(occs1, occs2,
     return(NULL)
   }
 
+  if (!is.logical(verbose)) {
+    warning(message("Argument 'verbose' is not of type 'logical'.\n"))
+    return(NULL)
+  }
+
   colVec <- c(occs1Col, occs2Col, agreeCol, landCol, waterCol)
   colTest <- areColors(colVec)
 
@@ -360,7 +379,9 @@ pointCompMap <- function(occs1, occs2,
   yIndex1 <- colParse1$yIndex
   interp1 <- colParse1$reportMessage
 
-  message(interp1)
+  if(verbose){
+    message(interp1)
+  }
 
   colNames2 <- colnames(occs2)
   colParse2 <- columnParse(occs2)
@@ -371,7 +392,9 @@ pointCompMap <- function(occs1, occs2,
   yIndex2 <- colParse2$yIndex
   interp2 <- colParse2$reportMessage
 
-  message(interp2)
+  if(verbose){
+    message(interp2)
+  }
 
   if(!all(c(colnames(occs1)[[xIndex1]] == colnames(occs2)[[xIndex2]],
            colnames(occs1)[[yIndex1]] == colnames(occs2)[[yIndex2]]))){
@@ -488,9 +511,8 @@ pointCompMap <- function(occs1, occs2,
 #' @param percent A whole number between 0 and 100 specifying
 #' how transparent the color should be.
 #'
-#' @return A `list` of length 2 with indices of the x and y
-#' columns, respectively, followed by a message with a plain
-#' text report of which columns were interpreted as x and y.
+#' @return A `character` string with hex color, including
+#' adjustment for transparency.
 #'
 #' @examples
 #'
@@ -527,6 +549,55 @@ transpColor <- function(color, percent = 50) {
   t.col <- rgb(rgb.val[1], rgb.val[2], rgb.val[3],
                maxColorValue = 255,
                alpha = (100 - percent) * 255 / 100)
+
+  ## Save the color
+  return(t.col)
+}
+
+#' @title Blend Colors
+#'
+#' @description Generates a blended color from two transparent colors
+#'
+#' @param color Anything that can be interpreted by `rgb`
+#' as a color.
+#'
+#' @param percent A whole number between 0 and 100 specifying
+#' how transparent the color should be.
+#'
+#' @return A `character` string with hex color, including
+#' adjustment for transparency.
+#'
+#' @examples
+#'
+#' blendColor(col1 = "#1B9E777F", col2 = "#7570B37F")
+#'
+#' @importFrom grDevices rgb
+#'
+#' @keywords internal plotting
+#'
+#' @export
+
+blendColor <- function( col1 = "#1b9e777F", col2 = "#7570b37F") {
+  colVec <- c(col1, col2)
+  colTest <- areColors(colVec)
+
+  if(!any(c(all(colTest), length(colTest) < 2))){
+    warning(paste0("'col1' and 'col2'
+                   must be recognized colors.\n"))
+    return(NULL)
+  }
+
+  ## Get RGB values for colors
+  rgb.val1 <- col2rgb(col1, alpha = TRUE)
+  rgb.val2 <- col2rgb(col2, alpha = TRUE)
+  alphaVal <- rgb.val1["alpha",] + rgb.val2["alpha",]
+  if(alphaVal >= 255){alphaVal <- 255}
+  ## Make new color using input color as base and transparency set by alpha
+  t.col <- rgb(red = mean(c(rgb.val1["red",], rgb.val2["red",])),
+               green = mean(c(rgb.val1["green",], rgb.val2["green",])),
+               blue = mean(c(rgb.val1["blue",], rgb.val2["blue",])),
+               alpha = alphaVal,
+               maxColorValue = 255)
 
   ## Save the color
   return(t.col)
@@ -573,12 +644,6 @@ transpColor <- function(color, percent = 50) {
 #' of occurrences, which will be color-coded to
 #' `occs2Col` in the resulting plot.
 #'
-#' @param colBoth Color for cells with presences for
-#' both `rast1` and `rast2`.
-#'
-#' @param colNeither Color for cells with absences for
-#' both `rast1` and `rast2`.
-#'
 #' @param landCol Color for land on map.
 #'
 #' @param land An optional coastline polygon shapefile
@@ -615,9 +680,8 @@ transpColor <- function(color, percent = 50) {
 #' @export
 
 rasterComp <- function(rast1 = NULL, rast2 = NULL,
-                       col1 = "red", col2 = "blue",
+                       col1 = "#1b9e777F", col2 = "#7570b37F",
                        rast1Name = "Set 1", rast2Name = "Set 2",
-                       colNeither = "white", colBoth = "purple",
                        land = NA, landCol = "black",
                        title = "A Raster Comparison", ...){
 
@@ -629,11 +693,11 @@ rasterComp <- function(rast1 = NULL, rast2 = NULL,
     maxpixels <- 50000
   }
 
-  colVec <- c(col1, col2, colBoth, colNeither, landCol)
+  colVec <- c(col1, col2, landCol)
   colTest <- areColors(colVec)
 
-  if(!any(c(all(colTest), length(colTest) < 4))){
-    warning(paste0("'col1', 'col2', 'colBoth', 'colNeither' and 'landCol'
+  if(!any(c(all(colTest), length(colTest) < 3))){
+    warning(paste0("'col1', 'col2', and 'landCol'
                    must be recognized colors.\n"))
     return(NULL)
   }
@@ -681,7 +745,8 @@ rasterComp <- function(rast1 = NULL, rast2 = NULL,
   myCols <- c(transpColor("white", percent = 100),
               transpColor(col1, percent = 50),
               transpColor(col2, percent = 50),
-              transpColor(colBoth, percent = 30))
+              blendColor(transpColor(col1, percent = 50),
+                         transpColor(col2, percent = 50)))
   if(any(is.na(land))){
     if(all(cellStats(rast2, sum) > 0, cellStats(rast1, sum) > 0)){
       spplot(rast1, col.regions = myCols[c(1,2)], cuts = 1, colorkey = FALSE,
@@ -875,6 +940,12 @@ oneRasterPlot <- function(rast,
     option <- "plasma"
   }
 
+  if("n" %in% names(args)){
+    n <- args$n
+  } else{
+    n = 11
+  }
+
   # Input error checking
   if(!grepl("Raster*", class(rast))){
     warning(paste0("'rast' must be of class 'Raster*'.\n"))
@@ -900,17 +971,17 @@ oneRasterPlot <- function(rast,
 
   #Function body
   at <- seq(from = cellStats(rast, min), to = cellStats(rast, max),
-            by = (cellStats(rast, max)-cellStats(rast, min))/11)
+            by = (cellStats(rast, max)-cellStats(rast, min))/n)
 
   if(any(is.na(land))){
     spplot(rast, col = "transparent",
-           col.regions = viridis(11, alpha = alpha,
+           col.regions = viridis(n = n, alpha = alpha,
                                  option = option),
            at = at, main = title,
            maxpixels = maxpixels)
   } else {
     spplot(rast, col = "transparent",
-           col.regions = viridis(11, alpha = alpha,
+           col.regions = viridis(n = n, alpha = alpha,
                                  option = option),
            at = at, main = title,
            maxpixels = maxpixels) +

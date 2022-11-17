@@ -3,6 +3,7 @@ knitr::opts_chunk$set(echo = TRUE, error = FALSE, fig.retina = 1, dpi = 80)
 knitr::opts_knit$set(root.dir = system.file('extdata', 
                                             package='voluModel'))
 
+## ----generating data for plotting---------------------------------------------
 library(voluModel) # Because of course
 library(ggplot2) # For fancy plotting
 library(rgdal, 
@@ -52,7 +53,7 @@ indices <- unique(occurrences$index)
 downsampledOccs <- data.frame()
 for(i in indices){
   tempPoints <- occurrences[occurrences$index==i,]
-  tempPoints <- downsample(tempPoints, temperature[[1]])
+  tempPoints <- downsample(tempPoints, temperature[[1]], verbose = FALSE)
   tempPoints$depth <- rep(layerNames[[i]], times = nrow(tempPoints))
   downsampledOccs <- rbind(downsampledOccs, tempPoints)
 }
@@ -85,33 +86,29 @@ envelopeModel3D <- temperaturePresence * AOUpresence
 envelopeModel3D <- mask(crop(envelopeModel3D, studyRegion), 
                         mask = studyRegion)
 names(envelopeModel3D) <- names(temperature)
-rm(AOUpresence, downsampledOccs, occsClean, occurrences, temperaturePresence, 
+rm(AOUpresence, downsampledOccs, occurrences, temperaturePresence, 
    tempPoints, aouLims, envtNames, i, indices, layerNames, td, tempLims)
-
-## ----packages, warning=FALSE, eval=FALSE--------------------------------------
-#  library(voluModel) # Because of course
-#  library(ggplot2) # For fancy plotting
-#  library(rgdal) # For vector stuff. Will eventually be replaced with sf.
-#  library(raster) # For raster stuff. Will eventually be replaced with terra.
-#  library(viridisLite) # For high-contrast plotting palettes
 
 ## ----loading land data, warning=FALSE, message=FALSE--------------------------
 land <- rnaturalearth::ne_countries(scale = "small", returnclass = "sf")[1]
 
-## ----pointMap, warning=FALSE, message=FALSE-----------------------------------
-pointMap(occs = occs, land = land, landCol = "black", spName = "Steindachneria argentea", 
-         ptSize = 2, ptCol = "orange")
+## ----pointMap, warning=FALSE, message=FALSE, eval=FALSE-----------------------
+#  pointMap(occs = occs, land = land, landCol = "black", spName = "Steindachneria argentea",
+#           ptSize = 2, ptCol = "orange")
+
+## ----pointMap plot, echo=FALSE, out.width = '100%', out.height= '100%'--------
+knitr::include_graphics("pointMap.png")
 
 ## ----pointCompMap, warning=FALSE, message=FALSE-------------------------------
 pointCompMap(occs1 = occs, occs1Col = "red", occs1Name = "Raw", 
              occs2 = occsWdata, occs2Col = "orange", occs2Name = "Clean",
              spName = "Steindachneria argentea", agreeCol = "purple",
-             land = land, landCol = "black", ptSize = 2)
+             land = land, landCol = "black", ptSize = 2, verbose = FALSE)
 
 ## ----oneRasterPlot------------------------------------------------------------
 oneRasterPlot(rast = temperature[[1]],
               land = land, title = "Sea Surface Temperature, WOA 2018",
-              landCol = "black", option = "mako")
+              landCol = "black", n = 11, option = "mako")
 
 ## ----rasterComp---------------------------------------------------------------
 rasterComp(rast1 = envelopeModel3D[[1]], rast1Name = "Surface",

@@ -1,3 +1,11 @@
+# voluModel 0.1.7
+
+- Default rasterComp() plotting colors have been adjusted to increase contrast
+- oneRasterPlot() adjusted to accept "n" argument for viridis() color scales
+- MOre explicit code in "Introduction"" and "Visualization"" vignettes 
+- Added verbose switch to mute messages about which columns are being interpreted as x, y, and/or z
+coordinates to all relevant functions (default verbose = TRUE)
+
 # voluModel 0.1.6
 
 - Updated license from ACM to GPL-3
