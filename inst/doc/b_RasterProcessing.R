@@ -16,6 +16,9 @@ library(ggplot2) # For supplementary visualization
 #  library(ggplot2) # For supplementary visualization
 #  library(fields) # For raster interpolation
 #  library(latticeExtra) # Some fancy plotting
+#  
+#  library(terra) # Now being transitioned in
+#  library(sf) # Now being transitioned in
 
 ## ----environmental data loading temperature, eval=T, message=FALSE, warning=FALSE, asis=T----
 td <- tempdir()

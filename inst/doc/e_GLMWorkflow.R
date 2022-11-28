@@ -12,6 +12,8 @@ library(ggplot2) # For fancy plotting
 library(rgdal,
         options("rgdal_show_exportToProj4_warnings"="none")) # For vector stuff. Will eventually be replaced with sf.
 library(raster) # For raster stuff. Will eventually be replaced with terra.
+library(terra) # Now being transitioned in
+library(sf) # Now being transitioned in
 library(viridisLite) # For high-contrast plotting palettes
 
 ## ----occurrence data, eval=TRUE-----------------------------------------------
@@ -90,11 +92,13 @@ pointCompMap(occs1 = occs, occs2 = occsClean,
 
 ## ----environmental background sampling, warning=FALSE, eval = FALSE-----------
 #  backgroundSamplingRegions <- marineBackground(occsClean, buff = 1000000)
+#  backgroundSamplingRegions <- sf::st_as_sf(backgroundSamplingRegions)
+#  backgroundSamplingRegions <- sf::st_transform(backgroundSamplingRegions, crs(land))
 #  plot(backgroundSamplingRegions, border = F, col = "gray",
 #       main = "Points and Background Sampling",
 #       axes = T)
 #  plot(land, col = "black", add = T)
-#  points(occurrences[,c("decimalLongitude", "decimalLatitude")],
+#  points(occsClean[,c("decimalLongitude", "decimalLatitude")],
 #         pch = 20, col = "red", cex = 1.5)
 
 ## ----environmental background sampling hidden, warning=FALSE, echo=FALSE------
@@ -120,8 +124,8 @@ occsWdata$response <- rep(1, times = nrow(occsWdata))
 ## ----background sampling------------------------------------------------------
 # Background
 backgroundVals <- mSampling3D(occs = occsClean, 
-                              envBrick = temperature, 
-                              mShp = backgroundSamplingRegions, 
+                              envBrick = rast(temperature), 
+                              mShp = vect(backgroundSamplingRegions), 
                               depthLimit = c(5, 800))
 oxyVals <- xyzSample(occs = backgroundVals, oxygenSmooth)
 tempVals <- xyzSample(occs = backgroundVals, temperature)

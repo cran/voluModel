@@ -5,9 +5,11 @@ knitr::opts_chunk$set(echo = TRUE, error = FALSE, fig.retina = 1, dpi = 80)
 library(voluModel) # Because of course
 library(dplyr) # To filter data
 library(ggplot2) # For fancy plotting
-library(rgdal, 
+library(rgdal,
         options("rgdal_show_exportToProj4_warnings"="none")) # For vector stuff. Will eventually be replaced with sf.
 library(raster) # For raster stuff. Will eventually be replaced with terra.
+library(terra) # Now being transitioned in
+library(sf) # Now being tranistioned in
 library(lattice) # For plotting
 
 ## ----show points, warning=FALSE, echo=TRUE, message=FALSE, eval=FALSE---------
@@ -159,6 +161,8 @@ gridExtra::grid.arrange(tempPlot, oxyPlot, nrow = 1)
 
 ## ----study region, message=FALSE, warning=FALSE, eval=FALSE-------------------
 #  studyRegion <- marineBackground(occurrences, buff = 1000000)
+#  studyRegion <- sf::st_as_sf(studyRegion)
+#  studyRegion <- sf::st_transform(studyRegion, crs(land))
 #  plot(studyRegion, border = F, col = "gray",
 #       main = "Points and Background Sampling",
 #       axes = T)

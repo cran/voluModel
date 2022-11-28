@@ -13,6 +13,8 @@ library(rgdal,
 library(raster) # For raster stuff. Will eventually be replaced with terra.
 library(rangeBuilder) # To compare marineBackground to getDynamicAlphaHull
 library(dplyr) # To filter data
+library(terra) # Now being transitioned in
+library(sf) # Now being transitioned in
 
 ## ----occurrence dataset, message=FALSE, warning = FALSE-----------------------
 # Get points
@@ -32,61 +34,6 @@ pointMap(occs = occurrences, ptCol = "orange", landCol = "black",
 ## ----point plot, echo=FALSE, out.width = '100%', out.height= '100%'-----------
 land <- rnaturalearth::ne_countries(scale = "small", returnclass = "sf")[1]
 knitr::include_graphics("pointMap.png")
-
-## ----alpha hull demonstration, message=FALSE, warning=FALSE, eval=FALSE-------
-#  trainingRegion <- marineBackground(occurrences,
-#                                  fraction = 1, partCount = 1, buff = 1000000,
-#                                  clipToOcean = F)
-#  plot(trainingRegion, border = F, col = "gray",
-#       main = "Mimimum of 100% Points in Training Region,\nMaximum of 1 Polygon Permitted, 100 km Buffer",
-#       axes = T)
-#  plot(land, col = "black", add = T)
-#  points(occurrences[,c("decimalLongitude", "decimalLatitude")],
-#         pch = 20, col = "red", cex = 1.5)
-
-## ----plot alpha hull demonstration, echo=FALSE, fig.width=7-------------------
-knitr::include_graphics("alphaHullDemonstration-1.png", )
-
-## ----clipToOcean demo, message=FALSE, warning=FALSE, eval=F-------------------
-#  trainingRegion <- marineBackground(occurrences,
-#                                     buff = 1000000,
-#                                     clipToOcean = T)
-#  plot(trainingRegion, border = F, col = "gray",
-#       main = "100 km Buffer,\n Training Region Clipped to Occupied Polygon",
-#       axes = T)
-#  plot(land, col = "black", add = T)
-#  points(occurrences[,c("decimalLongitude", "decimalLatitude")],
-#         pch = 20, col = "red", cex = 1.5)
-
-## ----plot clipToOcean demo, echo=FALSE----------------------------------------
-trainingRegion <- readRDS(system.file("extdata/backgroundSamplingRegions.rds",
-                              package='voluModel'))
-
-knitr::include_graphics("clipToOceanDemo-1.png")
-
-## ----meridian wrap demo, warning=FALSE, message=FALSE, eval=F-----------------
-#  # Fictional example occurrences
-#  pacificOccs <- occurrences
-#  pacificOccs$decimalLongitude <- pacificOccs$decimalLongitude - 100
-#  for (i in 1:length(pacificOccs$decimalLongitude)){
-#    if (pacificOccs$decimalLongitude[[i]] < -180){
-#      pacificOccs$decimalLongitude[[i]] <- pacificOccs$decimalLongitude[[i]] + 360
-#    }
-#  }
-#  
-#  # marine Background
-#  pacificTrainingRegion <- marineBackground(pacificOccs,
-#                                            fraction = 0.95, partCount = 3,
-#                                            clipToOcean = T)
-#  plot(pacificTrainingRegion, border = F, col = "gray",
-#       main = "marineBackground Antimeridian Wrap",
-#       axes = T)
-#  plot(land, col = "black", add = T)
-#  points(pacificOccs[,c("decimalLongitude", "decimalLatitude")],
-#         pch = 20, col = "red", cex = 1.5)
-
-## ----plot meridian wrap demo, echo=FALSE--------------------------------------
-knitr::include_graphics("meridianWrapDemo-1.png")
 
 ## ----environmental data loading, eval=T, asis=T, message = FALSE, warning=FALSE----
 td <- tempdir()
@@ -116,7 +63,7 @@ names(temperature) <- envtNames
 plot(temperature[[c(1, 50)]])
 
 ## ----column interpretations, message=TRUE, warning=TRUE-----------------------
-occsTest <- occurrences[1:5,]
+occsTest <- occurrences[19:24,]
 xyzSample(occs = occsTest, envBrick = temperature)
 colnames(occsTest) <- c("x", "y", "z")
 xyzSample(occs = occsTest, envBrick = temperature)
@@ -157,11 +104,72 @@ occurrences <- occurrences[complete.cases(occurrences),]
 
 head(occurrences)
 
+## ----alpha hull demonstration, message=FALSE, warning=FALSE, eval=FALSE-------
+#  trainingRegion <- marineBackground(occurrences,
+#                                  fraction = 1, partCount = 1, buff = 1000000,
+#                                  clipToOcean = F)
+#  trainingRegion <- sf::st_as_sf(trainingRegion)
+#  trainingRegion <- sf::st_transform(trainingRegion, crs(land))
+#  plot(trainingRegion, border = F, col = "gray",
+#       main = "Mimimum of 100% Points in Training Region,\nMaximum of 1 Polygon Permitted, 100 km Buffer",
+#       axes = T)
+#  plot(land, col = "black", add = T)
+#  points(occurrences[,c("decimalLongitude", "decimalLatitude")],
+#         pch = 20, col = "red", cex = 1.5)
+
+## ----plot alpha hull demonstration, echo=FALSE, fig.width=7-------------------
+knitr::include_graphics("alphaHullDemonstration-1.png", )
+
+## ----clipToOcean demo, message=FALSE, warning=FALSE, eval=F-------------------
+#  trainingRegion <- marineBackground(occurrences,
+#                                     buff = 1000000,
+#                                     clipToOcean = T)
+#  trainingRegion <- sf::st_as_sf(trainingRegion)
+#  trainingRegion <- sf::st_transform(trainingRegion, crs(land))
+#  plot(trainingRegion, border = F, col = "gray",
+#       main = "100 km Buffer,\n Training Region Clipped to Occupied Polygon",
+#       axes = T)
+#  plot(land, col = "black", add = T)
+#  points(occurrences[,c("decimalLongitude", "decimalLatitude")],
+#         pch = 20, col = "red", cex = 1.5)
+
+## ----plot clipToOcean demo, echo=FALSE----------------------------------------
+trainingRegion <- readRDS(system.file("extdata/backgroundSamplingRegions.rds",
+                              package='voluModel'))
+
+knitr::include_graphics("clipToOceanDemo-1.png")
+
+## ----meridian wrap demo, warning=FALSE, message=FALSE, eval=F-----------------
+#  # Fictional example occurrences
+#  pacificOccs <- occurrences
+#  pacificOccs$decimalLongitude <- pacificOccs$decimalLongitude - 100
+#  for (i in 1:length(pacificOccs$decimalLongitude)){
+#    if (pacificOccs$decimalLongitude[[i]] < -180){
+#      pacificOccs$decimalLongitude[[i]] <- pacificOccs$decimalLongitude[[i]] + 360
+#    }
+#  }
+#  
+#  # marine Background
+#  pacificTrainingRegion <- marineBackground(pacificOccs,
+#                                            fraction = 0.95, partCount = 3,
+#                                            clipToOcean = T)
+#  pacificTrainingRegion <- sf::st_as_sf(pacificTrainingRegion)
+#  pacificTrainingRegion <- sf::st_transform(pacificTrainingRegion, crs(land))
+#  plot(pacificTrainingRegion, border = F, col = "gray",
+#       main = "marineBackground Antimeridian Wrap",
+#       axes = T)
+#  plot(land, col = "black", add = T)
+#  points(pacificOccs[,c("decimalLongitude", "decimalLatitude")],
+#         pch = 20, col = "red", cex = 1.5)
+
+## ----plot meridian wrap demo, echo=FALSE--------------------------------------
+knitr::include_graphics("meridianWrapDemo-1.png")
+
 ## ----training points----------------------------------------------------------
 # Background
 backgroundVals <- mSampling3D(occs = occurrences, 
-                              envBrick = temperature, 
-                              mShp = trainingRegion, 
+                              envBrick = rast(temperature), 
+                              mShp = vect(trainingRegion), 
                               depthLimit = c(50, 1500))
 backgroundVals$temperature <- xyzSample(occs = backgroundVals, temperature)
 
