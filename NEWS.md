@@ -1,3 +1,7 @@
+# voluModel 0.1.9
+
+- Addressed ERRORs in vignettes resulting from package updates to rnaturalearth.
+
 # voluModel 0.1.8
 
 - Addressed ERRORs on CRAN resulting from package updates on which voluModel depends.

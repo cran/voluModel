@@ -188,11 +188,11 @@ marineBackground <- function(occs, clipToOcean = TRUE, verbose = TRUE, ...){
   upj <- st_crs(4326) # Unprojected WGS84
   pj <- st_crs(4087) # Projected WGS84
   occsForM <- vect(x = occs[,c(xIndex, yIndex)],
-                          geom = c(colNames[xIndex], colNames[yIndex]),
-                          crs = upj$wkt)
+                   geom = c(colNames[xIndex], colNames[yIndex]),
+                   crs = upj$wkt)
   occsForM <- project(occsForM, y = pj$wkt)
   occBuff <- suppressWarnings(buffer(occsForM,
-                                            width = buff))
+                                     width = buff))
   occBuff <- aggregate(occBuff)
 
   # Hull part
@@ -211,9 +211,8 @@ marineBackground <- function(occs, clipToOcean = TRUE, verbose = TRUE, ...){
     if(hull$alpha == "alphaMCH"){
       gdahAlternative <- TRUE
     }
-    hull <- st_transform(hull[[1]], crs = 4087)
-    if(xmin(ext(vect(hull))) < -20037000 ||
-       xmax(ext(vect(hull))) > 20037000){
+    hull <- st_transform(hull[[1]], crs = pj$wkt)
+    if(!all(st_is_valid(hull))){
       gdahAlternative <- TRUE
     }
   }
@@ -233,36 +232,20 @@ marineBackground <- function(occs, clipToOcean = TRUE, verbose = TRUE, ...){
     wholeM <- aggregate(wholeM)
   }
 
-  # Crop out land
-  land <- readRDS(system.file("extdata/smallLand.rds",
-                              package='voluModel'))
-  wholeM <- erase(wholeM, vect(land))
-
-  # Optional removal of unoccupied polygons
-  if(clipToOcean){
-    # First, split up disjunct polygons
-    wholeM <- disagg(wholeM)
-    polysContainingPoints <- apply(relate(wholeM, occsForM, "contains"),
-                                   MARGIN = 1, FUN = function(x) any(x))
-    wholeM <- wholeM[polysContainingPoints]
-  }
-
   # Putting it all together and fixing the date line
   worldExtent <- ext(-20037508,
-                            20037508,
-                            -10018754,
-                            10018754) # Plate-Carre world extent
-  #worldExtent <- as(worldExtent, 'SpatVector')
-  #crs(worldExtent) <- sp::CRS("+proj=eqc +lon_0=0 +datum=WGS84 +units=m +no_defs")
+                     20037508,
+                     -10018754,
+                     10018754) # Plate-Carre world extent
 
   # Get rid of slop at poles
   wholeM <- crop(wholeM, ext(c(xmin(wholeM),
-                                      xmax(wholeM),
-                                      ymin(worldExtent),
-                                      ymax(worldExtent))))
+                               xmax(wholeM),
+                               ymin(worldExtent),
+                               ymax(worldExtent))))
   # Wrap shapefiles at 180th meridian
   middle <- intersect(wholeM, worldExtent)
-  ends <- erase(wholeM, worldExtent)
+  ends <- disagg(erase(wholeM, worldExtent))
   if(length(ends) > 0){
     if(length(ends) == 1){
       if(xmin(ends) < -20037508){
@@ -290,8 +273,23 @@ marineBackground <- function(occs, clipToOcean = TRUE, verbose = TRUE, ...){
   }
 
   wholeM <- aggregate(wholeM)
-  wholeM <- project(wholeM, y = pj$wkt)
-  wholeM <- project(wholeM, y = upj$wkt)
+  crs(wholeM) <- pj$wkt
+
+  # Crop out land
+  land <- readRDS(system.file("extdata/smallLand.rds",
+                              package='voluModel'))
+  wholeM <- erase(wholeM, vect(land))
+
+  # Optional removal of unoccupied polygons
+  if(clipToOcean){
+    # First, split up disjunct polygons
+    wholeM <- disagg(wholeM)
+    polysContainingPoints <- apply(relate(wholeM, occsForM, "contains"),
+                                   MARGIN = 1, FUN = function(x) any(x))
+    wholeM <- wholeM[polysContainingPoints]
+  }
+  wholeM <- aggregate(wholeM)
+  wholeM <- terra::project(wholeM, y = upj$wkt)
 
   return(wholeM)
 }

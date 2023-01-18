@@ -40,9 +40,11 @@ occurrences <- occs %>%
 
 head(occurrences)
 land <- rnaturalearth::ne_countries(scale = "small", returnclass = "sf")[1]
+
+## ----plotting points, message=FALSE, warning=FALSE, include=FALSE-------------
 knitr::include_graphics("pointMap.png")
 
-## ----loading data, message=FALSE, warning=FALSE, include=TRUE-----------------
+## ----loading temperature data, message=FALSE, warning=FALSE, include=TRUE-----
 # Temperature
 td <- tempdir()
 unzip(system.file("extdata/woa18_decav_t00mn01_cropped.zip", 
@@ -66,6 +68,25 @@ envtNames <- gsub("[d,M]", "", names(temperature))
 envtNames[[1]] <- "0"
 names(temperature) <- envtNames
 
+## ----plotting temperature, eval = FALSE---------------------------------------
+#  # How do these files look?
+#  p1 <- oneRasterPlot(temperature[[1]], land = land, landCol = "black",
+#                title= "Temperature (C)")
+#  
+#  p2 <- oneRasterPlot(temperatureBottom,land = land, landCol = "black",
+#                title = "Temperature (C)")
+#  
+#  temp <- c("Surface" = p1, "Bottom" = p2)
+#  update(temp, strip  = strip.custom(strip.levels = TRUE,
+#                               horizontal = TRUE,
+#                               bg = "black",
+#                               fg = "white",
+#                               par.strip.text = list(col = "white", cex = 1.2, font = 2)))
+
+## ----temperature plot, echo=FALSE, out.width = '100%', out.height= '100%'-----
+knitr::include_graphics("TemperatureTopBottom.png")
+
+## ----loading oxygen data, message=FALSE, warning=FALSE, include=TRUE----------
 # Oxygen processing, pre-baked to save time
 load(system.file("extdata/oxygenSmooth.RData", 
                  package='voluModel'))
@@ -84,9 +105,6 @@ names(oxygenSmooth) <- names(temperature)
 #                               bg = "black",
 #                               fg = "white",
 #                               par.strip.text = list(col = "white", cex = 1.2, font = 2)))
-
-## ----temperature plot, echo=FALSE, out.width = '100%', out.height= '100%'-----
-knitr::include_graphics("TemperatureTopBottom.png")
 
 ## ----oxygen plot, echo=FALSE, out.width = '100%', out.height= '100%'----------
 knitr::include_graphics("OxygenTopBottom.png")
@@ -161,12 +179,12 @@ gridExtra::grid.arrange(tempPlot, oxyPlot, nrow = 1)
 
 ## ----study region, message=FALSE, warning=FALSE, eval=FALSE-------------------
 #  studyRegion <- marineBackground(occurrences, buff = 1000000)
-#  studyRegion <- sf::st_as_sf(studyRegion)
-#  studyRegion <- sf::st_transform(studyRegion, crs(land))
+#  landVect <- vect(land)
+#  landVect <- terra::project(landVect, y = studyRegion)
 #  plot(studyRegion, border = F, col = "gray",
 #       main = "Points and Background Sampling",
 #       axes = T)
-#  plot(land, col = "black", add = T)
+#  plot(landVect, col = "black", add = T)
 #  points(occurrences[,c("decimalLongitude", "decimalLatitude")],
 #         pch = 20, col = "red", cex = 1.5)
 
@@ -224,7 +242,8 @@ AOUpresence <- reclassify(oxygenSmooth[[1]],
 
 # Put it all together, surface
 envelopeModelSurface <- temperaturePresence * AOUpresence
-envelopeModelSurface <- mask(crop(envelopeModelSurface, studyRegion), 
+studyRegion <- as(studyRegion, "Spatial")
+envelopeModelSurface <- raster::mask(raster::crop(envelopeModelSurface, studyRegion), 
                              mask = studyRegion)
 
 # Get limits, bottom
