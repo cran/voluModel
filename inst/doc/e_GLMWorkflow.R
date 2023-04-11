@@ -1,17 +1,10 @@
 ## ----setup, include=FALSE-----------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE, error = FALSE, fig.retina = 1, dpi = 80)
-knitr::opts_knit$set(root.dir = system.file('extdata', 
-                                            package='voluModel'))
-load(system.file("extdata/oxygenSmooth.RData", 
-                 package='voluModel'))
 
 ## ----packages, warning=FALSE--------------------------------------------------
 library(voluModel) # Because of course
 library(dplyr) # For occurrence data filtration
 library(ggplot2) # For fancy plotting
-library(rgdal,
-        options("rgdal_show_exportToProj4_warnings"="none")) # For vector stuff. Will eventually be replaced with sf.
-library(raster) # For raster stuff. Will eventually be replaced with terra.
 library(terra) # Now being transitioned in
 library(sf) # Now being transitioned in
 library(viridisLite) # For high-contrast plotting palettes
@@ -39,35 +32,33 @@ ggplot(occsClean, aes(x = 1, y=depth)) +
   geom_boxplot(width=0.1)
 
 ## ----environmental data loading, eval=T, asis=T, message=FALSE----------------
+# Temperature
 td <- tempdir()
 unzip(system.file("extdata/woa18_decav_t00mn01_cropped.zip", 
                   package = "voluModel"),
       exdir = paste0(td, "/temperature"), junkpaths = T)
-temperature <- readOGR(dsn = paste0(td, "/temperature"), 
-                       layer ="woa18_decav_t00mn01_cropped")
-unlink(paste0(td, "/temperature"), recursive = T)
+temperature <- vect(paste0(td, "/temperature/woa18_decav_t00mn01_cropped.shp"))
 
-temperature@data[temperature@data == -999.999] <- NA
-
-# Creating a RasterBrick
-temperature <- rasterFromXYZ(cbind(temperature@coords,
-                                   temperature@data))
+# Creating a SpatRaster vector
+template <- centerPointRasterTemplate(temperature)
+tempTerVal <- rasterize(x = temperature, y = template, field = names(temperature))
 
 # Get names of depths
 envtNames <- gsub("[d,M]", "", names(temperature))
 envtNames[[1]] <- "0"
-names(temperature) <- envtNames
+names(tempTerVal) <- envtNames
+temperature <- tempTerVal
 
 ## ----environmental data loading oxygen, eval=T, asis=T, warning=FALSE---------
-load(system.file("extdata/oxygenSmooth.RData", 
-                 package='voluModel'))
+oxygenSmooth <- rast(system.file("extdata/oxygenSmooth.tif", 
+                                 package='voluModel'))
 
 # Change names to match temperature
 names(oxygenSmooth) <- names(temperature)
 
 ## ----downsample to voxel, eval=TRUE, warning=FALSE, message=FALSE-------------
 # Gets the layer index for each occurrence by matching to depth
-layerNames <- as.numeric(gsub("[X]", "", names(temperature)))
+layerNames <- as.numeric(names(temperature))
 occsClean$index <- unlist(lapply(occsClean$depth, FUN = function(x) which.min(abs(layerNames - x))))
 indices <- unique(occsClean$index)
 
@@ -102,7 +93,7 @@ pointCompMap(occs1 = occs, occs2 = occsClean,
 #         pch = 20, col = "red", cex = 1.5)
 
 ## ----environmental background sampling hidden, warning=FALSE, echo=FALSE------
-backgroundSamplingRegions <- readRDS(system.file("extdata/backgroundSamplingRegions.rds",
+backgroundSamplingRegions <- vect(system.file("extdata/backgroundSamplingRegions.shp",
                               package='voluModel'))
 
 ## ----plot study region plot, echo=FALSE, out.width = '100%', out.height= '100%'----
@@ -124,8 +115,8 @@ occsWdata$response <- rep(1, times = nrow(occsWdata))
 ## ----background sampling------------------------------------------------------
 # Background
 backgroundVals <- mSampling3D(occs = occsClean, 
-                              envBrick = rast(temperature), 
-                              mShp = vect(backgroundSamplingRegions), 
+                              envBrick = temperature, 
+                              mShp = backgroundSamplingRegions, 
                               depthLimit = c(5, 800))
 oxyVals <- xyzSample(occs = backgroundVals, oxygenSmooth)
 tempVals <- xyzSample(occs = backgroundVals, temperature)
@@ -164,26 +155,27 @@ glmModel <- glm(formula = response ~ Temperature *  AOU,
 summary(glmModel)
 
 ## ----project glm niche model--------------------------------------------------
-layerNames <- as.numeric(gsub("[X]", "", names(temperature)))
+layerNames <- as.numeric(names(temperature))
 index <- seq(from = match(min(datForMod$depth), layerNames), 
              to = match(max(datForMod$depth), layerNames), by = 1)
 depthPred <- NULL
 for(j in index){
-  depthPreds <- stack(temperature[[j]], oxygenSmooth[[j]])
+  depthPreds <- c(temperature[[j]], oxygenSmooth[[j]])
   crs(depthPreds) <- "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
   names(depthPreds) <- c("Temperature", "AOU")
   depthPred[[j]] <- mask(predict(depthPreds, glmModel), backgroundSamplingRegions)
   depthPred[[j]] <- crop(depthPred[[j]], backgroundSamplingRegions)
   names(depthPred[[j]]) <- layerNames[[j]]
 }
-glmPred <- stack(depthPred[!unlist(lapply(depthPred, FUN = function(x) is.null(x)))])
+glmPred <- rast(depthPred[!unlist(lapply(depthPred, FUN = function(x) is.null(x)))])
 
 ## ----glm niche threshold------------------------------------------------------
 glmThreshold <- quantile(xyzSample(datForMod[datForMod$response == 1,
                                              c("depth", "decimalLongitude", "decimalLatitude")], 
-                                   brick(glmPred)), .1, na.rm = T)[[1]] # MS90
+                                   glmPred), .1, na.rm = T)[[1]] # MS90
 glmThresholded <- glmPred > glmThreshold
-glmThresholded <- reclassify(glmThresholded, c(NA, NA, 0), include.lowest = T)
+rclMatrix <- matrix(c(NA, NA, 0), ncol = 3, byrow = TRUE)
+glmThresholded <- classify(glmThresholded, rclMatrix, include.lowest = T)
 
 ## ----thresholded glm niche model plotted--------------------------------------
 plotLayers(glmThresholded, 
@@ -192,7 +184,7 @@ plotLayers(glmThresholded,
 
 ## ----calculate MESS, warning=FALSE--------------------------------------------
 # Prepare environmental data
-layerNames <- as.numeric(gsub("[X]", "", names(temperature)))
+layerNames <- as.numeric(names(temperature))
 datForMod$index <- unlist(lapply(datForMod$depth, FUN = function(x) which.min(abs(layerNames - x))))
 indices <- unique(datForMod$index)
 
@@ -215,13 +207,19 @@ plotLayers(extrapolation, land = land, landCol = "black",
 noExtrapolation <- messBrick > 0
 
 glmThreshNoExtrapolation <- NULL
-for(i in 1:nlayers(noExtrapolation)){
-  croppedLayer <- glmThresholded[[i]] * noExtrapolation[[i]]
-  glmThreshNoExtrapolation <- stack(c(glmThreshNoExtrapolation, croppedLayer))
+for(i in 1:nlyr(noExtrapolation)){
+  extrapCut <- crop(noExtrapolation[[i]], y = glmThresholded[[i]])
+  croppedLayer <- glmThresholded[[i]] * extrapCut
+  glmThreshNoExtrapolation[[i]] <- croppedLayer
 }
+
+glmThreshNoExtrapolation <- rast(glmThreshNoExtrapolation)
 
 # Plot MESS
 plotLayers(glmThreshNoExtrapolation, land = land, 
            landCol = "black", 
            title = "Areas of suitable habitat with no model extrapolation,\n 5m to 800m")
+
+## ----cleanup temporary directory----------------------------------------------
+unlink(td, recursive = T)
 

@@ -1,16 +1,9 @@
 ## ----setup, include=FALSE-----------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE, error = FALSE, fig.retina = 1, dpi = 80)
-load(system.file("extdata/oxygenSmooth.RData", 
-                 package='voluModel'))
-load(system.file("extdata/oxygenBottom.RData",
-                 package = 'voluModel'))
 
 ## ----packages, message=FALSE, warning=FALSE-----------------------------------
 library(voluModel) # Because of course
 library(ggplot2) # For fancy plotting
-library(rgdal, 
-        options("rgdal_show_exportToProj4_warnings"="none")) # For vector stuff. Will eventually be replaced with sf.
-library(raster) # For raster stuff. Will eventually be replaced with terra.
 library(rangeBuilder) # To compare marineBackground to getDynamicAlphaHull
 library(dplyr) # To filter data
 library(terra) # Now being transitioned in
@@ -23,48 +16,46 @@ occs <- read.csv(system.file("extdata/Steindachneria_argentea.csv",
 occurrences <- occs %>% 
   dplyr::select(decimalLongitude, decimalLatitude, depth) %>%
   dplyr::distinct() %>% 
-  dplyr::filter(dplyr::between(depth, 1, 2000))
+  dplyr::filter(depth %in% 1:2000)
 
+## ----occurrence dataset plotting code, message=FALSE, warning = FALSE, eval=TRUE, echo = FALSE----
 # Map occurrences
 land <- rnaturalearth::ne_countries(scale = "small", returnclass = "sf")[1]
 pointMap(occs = occurrences, ptCol = "orange", landCol = "black",
              spName = "Steindachneria argentea", ptSize = 3,
              land = land)
 
-## ----point plot, echo=FALSE, out.width = '100%', out.height= '100%'-----------
-land <- rnaturalearth::ne_countries(scale = "small", returnclass = "sf")[1]
-knitr::include_graphics("pointMap.png")
-
 ## ----environmental data loading, eval=T, asis=T, message = FALSE, warning=FALSE----
+# Temperature
 td <- tempdir()
 unzip(system.file("extdata/woa18_decav_t00mn01_cropped.zip", 
                   package = "voluModel"),
       exdir = paste0(td, "/temperature"), junkpaths = T)
-temperature <- readOGR(dsn = paste0(td, "/temperature"), 
-                       layer ="woa18_decav_t00mn01_cropped")
-unlink(paste0(td, "/temperature"), recursive = T)
+temperature <- vect(paste0(td, "/temperature/woa18_decav_t00mn01_cropped.shp"))
 
-temperature@data[temperature@data == -999.999] <- NA
-
-# How are the data structured?
-head(temperature@data)
+# Looking at the dataset
+head(temperature)
 
 ## ----temperature to compatible RasterBrick------------------------------------
-# Creating a RasterBrick
-temperature <- rasterFromXYZ(cbind(temperature@coords,
-                                   temperature@data))
+# Creating a SpatRaster vector
+template <- centerPointRasterTemplate(temperature)
+tempTerVal <- rasterize(x = temperature, y = template, field = names(temperature))
 
 # Get names of depths
 envtNames <- gsub("[d,M]", "", names(temperature))
 envtNames[[1]] <- "0"
-names(temperature) <- envtNames
+names(tempTerVal) <- envtNames
+temperature <- tempTerVal
 
 # Here's a sampling of depth plots from the 102 depth layers available
 plot(temperature[[c(1, 50)]])
 
+rm(tempTerVal)
+
 ## ----column interpretations, message=TRUE, warning=TRUE-----------------------
 occsTest <- occurrences[19:24,]
 xyzSample(occs = occsTest, envBrick = temperature)
+
 colnames(occsTest) <- c("x", "y", "z")
 xyzSample(occs = occsTest, envBrick = temperature)
 
@@ -72,7 +63,7 @@ rm(occsTest)
 
 ## ----downsample to voxel, eval=TRUE, warning=FALSE, message=FALSE-------------
 # Gets the layer index for each occurrence by matching to depth
-layerNames <- as.numeric(gsub("[X]", "", names(temperature)))
+layerNames <- as.numeric(names(temperature))
 occurrences$index <- unlist(lapply(occurrences$depth, FUN = function(x) which.min(abs(layerNames - x))))
 indices <- unique(occurrences$index)
 downsampledOccs <- data.frame()
@@ -90,7 +81,7 @@ print(paste0("Original number of points: ", nrow(occs), "; number of downsampled
 
 ## ----plot downsample, warning=FALSE-------------------------------------------
 pointCompMap(occs1 = occs, occs2 = occurrences, 
-             occs1Name = "Original", occs2Name = "Cleaned", 
+             occs1Name = "original", occs2Name = "cleaned", 
              spName = "Steindachneria argentea", 
              land = land, verbose = FALSE)
 
@@ -108,10 +99,8 @@ head(occurrences)
 #  trainingRegion <- marineBackground(occurrences,
 #                                  fraction = 1, partCount = 1, buff = 1000000,
 #                                  clipToOcean = F)
-#  trainingRegion <- sf::st_as_sf(trainingRegion)
-#  trainingRegion <- sf::st_transform(trainingRegion, crs(land))
 #  plot(trainingRegion, border = F, col = "gray",
-#       main = "Mimimum of 100% Points in Training Region,\nMaximum of 1 Polygon Permitted, 100 km Buffer",
+#       main = "100% Points, Max 1 Polygon Permitted, 100 km Buffer",
 #       axes = T)
 #  plot(land, col = "black", add = T)
 #  points(occurrences[,c("decimalLongitude", "decimalLatitude")],
@@ -124,17 +113,15 @@ knitr::include_graphics("alphaHullDemonstration-1.png", )
 #  trainingRegion <- marineBackground(occurrences,
 #                                     buff = 1000000,
 #                                     clipToOcean = T)
-#  trainingRegion <- sf::st_as_sf(trainingRegion)
-#  trainingRegion <- sf::st_transform(trainingRegion, crs(land))
 #  plot(trainingRegion, border = F, col = "gray",
-#       main = "100 km Buffer,\n Training Region Clipped to Occupied Polygon",
+#       main = "100 km Buffer, Clipped to Occupied Polygon",
 #       axes = T)
 #  plot(land, col = "black", add = T)
 #  points(occurrences[,c("decimalLongitude", "decimalLatitude")],
 #         pch = 20, col = "red", cex = 1.5)
 
 ## ----plot clipToOcean demo, echo=FALSE----------------------------------------
-trainingRegion <- readRDS(system.file("extdata/backgroundSamplingRegions.rds",
+trainingRegion <- vect(system.file("extdata/backgroundSamplingRegions.shp",
                               package='voluModel'))
 
 knitr::include_graphics("clipToOceanDemo-1.png")
@@ -153,8 +140,6 @@ knitr::include_graphics("clipToOceanDemo-1.png")
 #  pacificTrainingRegion <- marineBackground(pacificOccs,
 #                                            fraction = 0.95, partCount = 3,
 #                                            clipToOcean = T)
-#  pacificTrainingRegion <- sf::st_as_sf(pacificTrainingRegion)
-#  pacificTrainingRegion <- sf::st_transform(pacificTrainingRegion, crs(land))
 #  plot(pacificTrainingRegion, border = F, col = "gray",
 #       main = "marineBackground Antimeridian Wrap",
 #       axes = T)
@@ -168,8 +153,8 @@ knitr::include_graphics("meridianWrapDemo-1.png")
 ## ----training points----------------------------------------------------------
 # Background
 backgroundVals <- mSampling3D(occs = occurrences, 
-                              envBrick = rast(temperature), 
-                              mShp = vect(trainingRegion), 
+                              envBrick = temperature, 
+                              mShp = trainingRegion, 
                               depthLimit = c(50, 1500))
 backgroundVals$temperature <- xyzSample(occs = backgroundVals, temperature)
 
@@ -201,11 +186,14 @@ backgroundVals$response <- as.factor(backgroundVals$response)
 dataForModeling <- rbind(occurrences, backgroundVals[,colnames(occurrences)])
 ggplot(dataForModeling, aes(x = temperature, fill = response, color = response)) +
   geom_density(alpha = .6) +
-  scale_color_manual(values=c("#999999", "#E69F00", "#56B4E9"), 
+  scale_color_manual(values=c("#999999", "#E69F00"), 
                      labels = c("Pseudoabsence", "Presence")) +
-  scale_fill_manual(values=c("#999999", "#E69F00", "#56B4E9"), 
+  scale_fill_manual(values=c("#999999", "#E69F00"), 
                     labels = c("Pseudoabsence", "Presence")) +
   labs(title="Temperature Sampling Density,\nOccurrences vs. Pseudoabsences",
        x="Temperature (C)", y = "Density")+
   theme_classic()
+
+## ----cleanup temporary directory----------------------------------------------
+unlink(td, recursive = T)
 

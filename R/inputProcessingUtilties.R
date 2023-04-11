@@ -20,18 +20,18 @@
 #' text report of which columns were interpreted as x and y.
 #'
 #' @examples
-#' library(raster)
+#' library(terra)
 #'
 #' # Create sample raster
-#' r <- raster(ncol=10, nrow=10)
+#' r <- rast(ncol=10, nrow=10)
 #' values(r) <- 1:100
 #'
 #' # Create test occurrences
 #' set.seed(0)
-#' longitude <- sample(extent(r)[1]:extent(r)[2],
+#' longitude <- sample(ext(r)[1]:ext(r)[2],
 #'                     size = 10, replace = FALSE)
 #' set.seed(0)
-#' latitude <- sample(extent(r)[3]:extent(r)[4],
+#' latitude <- sample(ext(r)[3]:ext(r)[4],
 #'                    size = 10, replace = FALSE)
 #' set.seed(0)
 #' depth <- sample(0:35, size = 10, replace = TRUE)
@@ -42,8 +42,6 @@
 #'                       wDepth = FALSE)
 #' result <- columnParse(occs = occurrences,
 #'                       wDepth = TRUE)
-#'
-#' @import raster
 #'
 #' @keywords internal
 #'
@@ -113,7 +111,7 @@ columnParse <- function(occs, wDepth = FALSE){
 #' named "longitude" and "latitude" or that
 #' can be coerced into this format.
 #'
-#' @param rasterTemplate A `Raster*` object to serve
+#' @param rasterTemplate A `SpatRaster` object to serve
 #' as a template for the resolution at which `occs` should be
 #' downsampled.
 #'
@@ -125,24 +123,25 @@ columnParse <- function(occs, wDepth = FALSE){
 #' input data into this format.
 #'
 #' @examples
-#' library(raster)
+#' library(terra)
 #' # Create sample raster
-#' r <- raster(ncol=10, nrow=10)
+#' r <- rast(ncol=10, nrow=10)
 #' values(r) <- 1:100
 #'
 #' # Create test occurrences
 #' set.seed(0)
-#' longitude <- sample(extent(r)[1]:extent(r)[2],
+#' longitude <- sample(ext(r)[1]:ext(r)[2],
 #'                     size = 10, replace = FALSE)
 #' set.seed(0)
-#' latitude <- sample(extent(r)[3]:extent(r)[4],
+#' latitude <- sample(ext(r)[3]:ext(r)[4],
 #'                    size = 10, replace = FALSE)
 #' occurrences <- as.data.frame(cbind(longitude,latitude))
 #'
 #' # Here's the function
 #' result <- downsample(occs = occurrences, rasterTemplate = r)
 #'
-#' @import raster
+#' @import terra
+#' @importFrom stats complete.cases
 #'
 #' @keywords inputProcessing
 #' @export
@@ -153,8 +152,8 @@ downsample <- function(occs, rasterTemplate, verbose = TRUE){
     return(NULL)
   }
 
-  if(!grepl("Raster", class(rasterTemplate))){
-    warning(paste0("'rasterTemplate' must be of class 'Raster*'.\n"))
+  if(!grepl("SpatRaster", class(rasterTemplate))){
+    warning(paste0("'rasterTemplate' must be of class 'SpatRaster'.\n"))
     return(NULL)
   }
 
@@ -194,15 +193,15 @@ downsample <- function(occs, rasterTemplate, verbose = TRUE){
 #' @title Bottom raster generation
 #'
 #' @description Samples deepest depth values from a
-#' `SpatialPointsDataFrame` and generates a `RasterLayer`.
+#' `SpatVector` data frame and generates a `SpatRaster`.
 #'
-#' @param rawPointData A `SpatialPointsDataFrame` object from which
+#' @param rawPointData A `SpatVector` object from which
 #' bottom variables will be sampled. See Details for more about format.
 #'
-#' @return A `RasterLayer` designed to approximate sea bottom
+#' @return A `SpatRaster` designed to approximate sea bottom
 #' measurements for modeling species' distributions and/or niches.
 #'
-#' @details `rawPointData` is a `SpatialPointsDataFrame` object that
+#' @details `rawPointData` is a `SpatVector` object that
 #' contains measurements of a single environmental variable (e.g.
 #' salinity, temperature, etc.) with x, y, and z coordinates. The
 #' measurements in the `data.frame` should be organized so that each
@@ -212,11 +211,13 @@ downsample <- function(occs, rasterTemplate, verbose = TRUE){
 #' (\url{https://www.ncei.noaa.gov/access/world-ocean-atlas-2018/}).
 #' The function selects the "deepest" (rightmost) measurement at each
 #' x, y coordinate pair that contains data. These measurements are then
-#' rasterized at the resolution and extent of the x,y coordinates.
+#' rasterized at the resolution and extent of the x,y coordinates, under
+#' the assumption that x and y intervals are equal and represent the center
+#' of a cell.
 #'
 #' @examples
 #'
-#' library(sp)
+#' library(terra)
 #'
 #' # Create point grid
 #' coords <- data.frame(x = rep(seq(1:5), times = 5),
@@ -232,30 +233,103 @@ downsample <- function(occs, rasterTemplate, verbose = TRUE){
 #' dd$d10M[c(3:5, 21:23)] <- NA
 #' dd$d5M[c(4, 22)] <- NA
 #'
+#' dd[,c("x","y")] <- coords
+#'
 #' # Create SpatialPointsDataFrame
-#' sp <- sp::SpatialPointsDataFrame(coords = coords,
-#'                             data = dd)
+#' sp <- vect(dd, geom = c("x", "y"))
 #'
 #' # Here's the function
 #' result <- bottomRaster(rawPointData = sp)
 #' plot(result)
 #'
-#' @import raster
-#' @importFrom stats complete.cases
+#' @import terra
 #'
 #' @keywords inputProcessing
 #' @export
 
 # Samples bottom values from raster bricks
 bottomRaster <- function(rawPointData){
-  if(!is(rawPointData, "SpatialPointsDataFrame")){
-    warning(paste0("'rawPointData' must be class 'SpatialPointsDataFrame'.\n"))
+  if(!is(rawPointData, "SpatVector")){
+    warning(paste0("'rawPointData' must be class 'SpatVector'.\n"))
     return(NULL)
   }
 
-  bottomSample <- apply(rawPointData@data, MARGIN = 1,
+  rpdf <- as.data.frame(rawPointData)
+
+  template <- centerPointRasterTemplate(rawPointData)
+
+  bottomSample <- apply(rpdf, MARGIN = 1,
                         FUN = function(x) tail(x[!is.na(x)],1))
-  rawPointData@data$Bottom <- bottomSample
-  bRaster <- rasterFromXYZ(cbind(rawPointData@coords,rawPointData@data$Bottom))
+  rawPointData$Bottom <- bottomSample
+
+  bRaster <- terra::rasterize(x = rawPointData, y = template, field = "Bottom")
   return(bRaster)
+}
+
+#' @title Center Point Raster Template
+#'
+#' @description Samples deepest depth values from a
+#' `SpatVector` point object and generates a `SpatRaster`.
+#'
+#' @param rawPointData A `SpatVector` object with points
+#' that will represent the center of each cell in the output
+#' template.
+#'
+#' @return An empty `SpatRaster` designed to serve as a template for
+#' rasterizing `SpatVector` objects.
+#'
+#' @details `rawPointData` is a `SpatVector` object that
+#' contains x and y coordinates.
+#'
+#' @seealso \code{\link[terra:rasterize]{rasterize}}
+#'
+#' @examples
+#'
+#' library(terra)
+#'
+#' # Create point grid
+#' coords <- data.frame(x = rep(seq(1:5), times = 5),
+#'                     y = unlist(lapply(1:5, FUN = function(x) {
+#'                       rep(x, times = 5)})))
+#'
+#' # Create data and add NAs to simulate uneven bottom depths
+#' dd <- data.frame(SURFACE = 1:25,
+#'                 d5M = 6:30,
+#'                 d10M = 11:35,
+#'                 d25M = 16:40)
+#' dd$d25M[c(1:5, 18:25)] <- NA
+#' dd$d10M[c(3:5, 21:23)] <- NA
+#' dd$d5M[c(4, 22)] <- NA
+#'
+#' dd[,c("x","y")] <- coords
+#'
+#' # Create SpatialPointsDataFrame
+#' sp <- vect(dd, geom = c("x", "y"))
+#'
+#' # Here's the function
+#' template <- centerPointRasterTemplate(rawPointData = sp)
+#' class(template)
+#'
+#' @import terra
+#'
+#' @keywords inputProcessing
+#' @export
+
+centerPointRasterTemplate <- function(rawPointData){
+  if(!is(rawPointData, "SpatVector")){
+    warning(paste0("'rawPointData' must be class 'SpatVector'.\n"))
+    return(NULL)
+  }
+  rpdGeom <- geom(rawPointData)
+
+  centeringAdjustment <- min(abs(diff(unique(rpdGeom[,"x"]))), abs(diff(unique(rpdGeom[,"y"]))))/2
+  oldExtent <- ext(rawPointData)
+  newExtent <- ext(oldExtent[1] - centeringAdjustment,
+                   oldExtent[2] + centeringAdjustment,
+                   oldExtent[3] - centeringAdjustment,
+                   oldExtent[4] + centeringAdjustment)
+
+  template <- rast(nrows=length(unique(rpdGeom[,"y"])),
+                   ncols=length(unique(rpdGeom[,"x"])), extent = newExtent)
+  return(template)
 }

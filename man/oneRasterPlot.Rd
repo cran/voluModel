@@ -4,40 +4,58 @@
 \alias{oneRasterPlot}
 \title{Single raster plot}
 \usage{
-oneRasterPlot(rast, land = NA, landCol = "black", title = "A Raster", ...)
+oneRasterPlot(
+  rast,
+  land = NA,
+  landCol = "black",
+  scaleRange = NA,
+  graticule = TRUE,
+  title = "A Raster",
+  verbose = TRUE,
+  ...
+)
 }
 \arguments{
-\item{rast}{A single \verb{Raster*} layer on a continuous
+\item{rast}{A single \code{SpatRaster} layer on a continuous
 scale.}
 
 \item{land}{An optional coastline polygon shapefile
-of type \code{sf} to provide geographic context for the
-occurrence points.}
+of types \code{sf} or \code{SpatRaster} to provide geographic
+context for the occurrence points.}
 
 \item{landCol}{Color for land on map.}
 
+\item{scaleRange}{Optional numeric vector containing
+maximum and minimum values for color scale. Helpful
+when making multiple plots for comparison. Defaults
+to minimum and maximum of input \code{rast}.}
+
+\item{graticule}{\code{logical}. Do you want a grid of lon/lat lines?}
+
 \item{title}{A title for the plot.}
 
+\item{verbose}{\code{logical}. Switching to \code{FALSE} mutes message alerting
+user if input \code{rast} values exceed a specified \code{scaleRange}.}
+
 \item{...}{Additional optional arguments to pass to
-\code{spplot} initial plot object or \code{viridis}.}
+\code{plot} initial plot object or \code{viridis}.}
 }
 \value{
-A plot of class \code{trellis} mapping the values
-of the input raster layer
+A plot of mapping the values of the input raster layer
 }
 \description{
-A convenient wrapper around \code{spplot}
+A convenient wrapper around \code{ggplot}
 to generate a formatted plot of a single raster.
 }
 \examples{
-library(raster)
-rast <- raster(ncol=10, nrow=10)
+library(terra)
+rast <- rast(ncol=10, nrow=10)
 values(rast) <- seq(0,99, 1)
 
 oneRasterPlot(rast = rast)
 
 }
 \seealso{
-\code{\link[viridisLite:viridis]{viridis}} \code{\link[raster:spplot]{spplot}}
+\code{\link[viridisLite:viridis]{viridis}} \code{\link[ggplot2:ggplot]{ggplot}}
 }
 \keyword{plotting}

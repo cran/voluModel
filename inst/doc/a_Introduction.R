@@ -5,30 +5,9 @@ knitr::opts_chunk$set(echo = TRUE, error = FALSE, fig.retina = 1, dpi = 80)
 library(voluModel) # Because of course
 library(dplyr) # To filter data
 library(ggplot2) # For fancy plotting
-library(rgdal,
-        options("rgdal_show_exportToProj4_warnings"="none")) # For vector stuff. Will eventually be replaced with sf.
-library(raster) # For raster stuff. Will eventually be replaced with terra.
 library(terra) # Now being transitioned in
-library(sf) # Now being tranistioned in
-library(lattice) # For plotting
 
-## ----show points, warning=FALSE, echo=TRUE, message=FALSE, eval=FALSE---------
-#  occs <- read.csv(system.file("extdata/Steindachneria_argentea.csv",
-#                               package='voluModel'))
-#  
-#  # Filter points
-#  occurrences <- occs %>%
-#    dplyr::select(decimalLongitude, decimalLatitude, depth) %>%
-#    dplyr::distinct() %>%
-#    dplyr::filter(dplyr::between(depth, 1, 2000))
-#  
-#  head(occurrences)
-#  land <- rnaturalearth::ne_countries(scale = "small", returnclass = "sf")[1]
-#  pointMap(occs = occurrences, ptCol = "orange", landCol = "black",
-#               spName = "Steindachneria argentea", ptSize = 3,
-#               land = land)
-
-## ----point plot, echo=FALSE, out.width = '100%', out.height= '100%'-----------
+## ----show points, warning=FALSE, echo=TRUE, message=FALSE, eval=TRUE----------
 occs <- read.csv(system.file("extdata/Steindachneria_argentea.csv", 
                              package='voluModel'))
 
@@ -36,13 +15,13 @@ occs <- read.csv(system.file("extdata/Steindachneria_argentea.csv",
 occurrences <- occs %>% 
   dplyr::select(decimalLongitude, decimalLatitude, depth) %>%
   dplyr::distinct() %>% 
-  dplyr::filter(dplyr::between(depth, 1, 2000))
+  filter(depth %in% 1:2000)
 
 head(occurrences)
 land <- rnaturalearth::ne_countries(scale = "small", returnclass = "sf")[1]
-
-## ----plotting points, message=FALSE, warning=FALSE, include=FALSE-------------
-knitr::include_graphics("pointMap.png")
+pointMap(occs = occurrences, ptCol = "orange", landCol = "black",
+             spName = "Steindachneria argentea", ptSize = 3,
+             land = land)
 
 ## ----loading temperature data, message=FALSE, warning=FALSE, include=TRUE-----
 # Temperature
@@ -50,70 +29,59 @@ td <- tempdir()
 unzip(system.file("extdata/woa18_decav_t00mn01_cropped.zip", 
                   package = "voluModel"),
       exdir = paste0(td, "/temperature"), junkpaths = T)
-temperature <- readOGR(dsn = paste0(td, "/temperature"), 
-                       layer ="woa18_decav_t00mn01_cropped")
-unlink(paste0(td, "/temperature"), recursive = T)
-
-temperature@data[temperature@data == -999.999] <- NA
+temperature <- vect(paste0(td, "/temperature/woa18_decav_t00mn01_cropped.shp"))
 
 # Creating a bottom raster
 temperatureBottom <- bottomRaster(temperature)
 
-# Creating a RasterBrick
-temperature <- rasterFromXYZ(cbind(temperature@coords,
-                                   temperature@data))
+# Creating a SpatRaster vector
+template <- centerPointRasterTemplate(temperature)
+tempTerVal <- terra::rasterize(x = temperature, y = template, field = names(temperature))
 
 # Get names of depths
 envtNames <- gsub("[d,M]", "", names(temperature))
 envtNames[[1]] <- "0"
-names(temperature) <- envtNames
+names(tempTerVal) <- envtNames
+temperature <- tempTerVal
+rm(tempTerVal)
 
 ## ----plotting temperature, eval = FALSE---------------------------------------
 #  # How do these files look?
+#  par(mfrow=c(1,2))
 #  p1 <- oneRasterPlot(temperature[[1]], land = land, landCol = "black",
-#                title= "Temperature (C)")
+#                title= "Surface Temperature (C)")
 #  
 #  p2 <- oneRasterPlot(temperatureBottom,land = land, landCol = "black",
-#                title = "Temperature (C)")
-#  
-#  temp <- c("Surface" = p1, "Bottom" = p2)
-#  update(temp, strip  = strip.custom(strip.levels = TRUE,
-#                               horizontal = TRUE,
-#                               bg = "black",
-#                               fg = "white",
-#                               par.strip.text = list(col = "white", cex = 1.2, font = 2)))
+#                title = "Bottom Temperature (C)")
 
 ## ----temperature plot, echo=FALSE, out.width = '100%', out.height= '100%'-----
 knitr::include_graphics("TemperatureTopBottom.png")
 
 ## ----loading oxygen data, message=FALSE, warning=FALSE, include=TRUE----------
 # Oxygen processing, pre-baked to save time
-load(system.file("extdata/oxygenSmooth.RData", 
-                 package='voluModel'))
-load(system.file("extdata/oxygenBottom.RData",
-                 package = 'voluModel'))
+oxygenSmooth <- rast(system.file("extdata/oxygenSmooth.tif", 
+                                 package='voluModel'))
+oxygenBottom <- rast(system.file("extdata/oxygenBottom.tif", 
+                                 package="voluModel"))
 names(oxygenSmooth) <- names(temperature)
 
 ## ----oxygen plotting, echo=TRUE, eval = FALSE, message=FALSE, warning=FALSE----
+#  par(mfrow=c(1,2))
 #  p3 <- oneRasterPlot(oxygenSmooth[[1]], land = land, landCol = "black",
-#                title= "Apparent Oxygen Utilization (µmol/kg),\n interpolated and smoothed")
+#                title= "Surface Apparent Oxygen Utilization (µmol/kg),\ninterpolated and smoothed")
 #  p4 <- oneRasterPlot(oxygenBottom, land = land, landCol = "black",
-#       title = "Apparent Oxygen Utilization (µmol/kg), interpolated and smoothed")
-#  temp <- c("Surface" = p3, "Bottom" = p4)
-#  update(temp, strip  = strip.custom(strip.levels = TRUE,
-#                               horizontal = TRUE,
-#                               bg = "black",
-#                               fg = "white",
-#                               par.strip.text = list(col = "white", cex = 1.2, font = 2)))
+#       title = "Bottom Apparent Oxygen Utilization (µmol/kg),\ninterpolated and smoothed")
 
 ## ----oxygen plot, echo=FALSE, out.width = '100%', out.height= '100%'----------
 knitr::include_graphics("OxygenTopBottom.png")
 
 ## ----occurrence and depth matchup---------------------------------------------
 # Gets the layer index for each occurrence by matching to depth
-layerNames <- as.numeric(gsub("[X]", "", names(temperature)))
+layerNames <- as.numeric(names(temperature))
 occurrences$index <- unlist(lapply(occurrences$depth, FUN = function(x) which.min(abs(layerNames - x))))
 indices <- unique(occurrences$index)
+
+# Downsamples occurrences in each depth layer
 downsampledOccs <- data.frame()
 for(i in indices){
   tempPoints <- occurrences[occurrences$index==i,]
@@ -121,24 +89,30 @@ for(i in indices){
   tempPoints$depth <- rep(layerNames[[i]], times = nrow(tempPoints))
   downsampledOccs <- rbind(downsampledOccs, tempPoints)
 }
+occurrences <- downsampledOccs
 occurrences <- occurrences[,c("decimalLatitude", "decimalLongitude", "depth")]
+
 rm(indices, layerNames, tempPoints, i, downsampledOccs, occs)
 
 ## ----data extraction, echo=FALSE, message=FALSE, warning=FALSE----------------
 # Extract temperature
 threeDimTemp <- xyzSample(occs = occurrences, temperature)
 threeDimTemp <- cbind(rep("X, Y,\nZ", length(threeDimTemp)), threeDimTemp)
-surfTemp <- extract(x = temperature[[1]], occurrences[,c("decimalLongitude", "decimalLatitude")])
+surfTemp <- extract(x = temperature[[1]], 
+                    occurrences[,c("decimalLongitude", "decimalLatitude")])[,2]
 surfTemp <- cbind(rep("X, Y,\nSurface", length(surfTemp)), surfTemp)
-bottomTemp <- extract(x = temperatureBottom, occurrences[,c("decimalLongitude", "decimalLatitude")])
+bottomTemp <- extract(x = temperatureBottom, 
+                      occurrences[,c("decimalLongitude", "decimalLatitude")])[,2]
 bottomTemp <- cbind(rep("X, Y,\nBottom", length(bottomTemp)), bottomTemp)
 
 # Extract AOU
 threeDimOxy <- xyzSample(occs = occurrences, oxygenSmooth)
 threeDimOxy <- cbind(rep("X, Y,\nZ", length(threeDimOxy)), threeDimOxy)
-surfOxy <- extract(x = oxygenSmooth[[1]], occurrences[,c("decimalLongitude", "decimalLatitude")])
+surfOxy <- extract(x = oxygenSmooth[[1]], 
+                   occurrences[,c("decimalLongitude", "decimalLatitude")])[,2]
 surfOxy <- cbind(rep("X, Y,\nSurface", length(surfOxy)), surfOxy)
-bottomOxy <- extract(x = oxygenBottom, occurrences[,c("decimalLongitude", "decimalLatitude")])
+bottomOxy <- extract(x = oxygenBottom, 
+                     occurrences[,c("decimalLongitude", "decimalLatitude")])[,2]
 bottomOxy <- cbind(rep("X, Y,\nBottom", length(bottomOxy)), bottomOxy)
 
 ## ----temperature violin plots, echo=FALSE, message=FALSE, warning=FALSE-------
@@ -158,7 +132,7 @@ allOxy$Oxygen <- as.numeric(allOxy$Oxygen)
 # Plotting
 groups <- c("X, Y,\nSurface", "X, Y,\nBottom", "X, Y,\nZ")
 tempPlot <- ggplot(allTemp, aes(x=Group, y=Temperature)) + 
-  geom_boxplot(fill="#b2182b", notch = T) +
+  geom_boxplot(fill="#b2182b", notch = TRUE) +
   theme_classic(base_size = 15) +
   theme(axis.title.x = element_blank(), 
         text = element_text(family = "Arial"), 
@@ -167,7 +141,7 @@ tempPlot <- ggplot(allTemp, aes(x=Group, y=Temperature)) +
   ylab("Temperature (C)")
 
 oxyPlot <- ggplot(allOxy, aes(x=Group, y=Oxygen)) + 
-  geom_boxplot(fill="#2166ac", notch = T) +
+  geom_boxplot(fill="#2166ac", notch = TRUE) +
   theme_classic(base_size = 15) +
   theme(axis.title.x = element_blank(), 
         text = element_text(family = "Arial"), 
@@ -178,7 +152,7 @@ oxyPlot <- ggplot(allOxy, aes(x=Group, y=Oxygen)) +
 gridExtra::grid.arrange(tempPlot, oxyPlot, nrow = 1)
 
 ## ----study region, message=FALSE, warning=FALSE, eval=FALSE-------------------
-#  studyRegion <- marineBackground(occurrences, buff = 1000000)
+#  studyRegion <- marineBackground(occurrences, buff = 1000000, clipToOcean = TRUE)
 #  landVect <- vect(land)
 #  landVect <- terra::project(landVect, y = studyRegion)
 #  plot(studyRegion, border = F, col = "gray",
@@ -189,16 +163,16 @@ gridExtra::grid.arrange(tempPlot, oxyPlot, nrow = 1)
 #         pch = 20, col = "red", cex = 1.5)
 
 ## ----study region hidden, message=FALSE, warning=FALSE, eval=TRUE, echo=FALSE----
-studyRegion <- readRDS(system.file("extdata/backgroundSamplingRegions.rds",
-                              package='voluModel'))
+studyRegion <- vect(system.file("extdata/backgroundSamplingRegions.shp",
+                                package='voluModel'))
 
 ## ----plot study region, echo=FALSE, out.width = '100%', out.height= '100%'----
 knitr::include_graphics("PointsAndTrainingRegion.png")
 
 ## ----sampling-----------------------------------------------------------------
 # Surface Presences
-oxyVals <- extract(x = oxygenSmooth[[1]], occurrences[,c("decimalLongitude", "decimalLatitude")])
-tempVals <- extract(x = temperature[[1]], occurrences[,c("decimalLongitude", "decimalLatitude")])
+oxyVals <- extract(x = oxygenSmooth[[1]], occurrences[,c("decimalLongitude", "decimalLatitude")])[,2]
+tempVals <- extract(x = temperature[[1]], occurrences[,c("decimalLongitude", "decimalLatitude")])[,2]
 vals <- cbind(occurrences, oxyVals, tempVals)
 colnames(vals) <- c("decimalLongitude", "decimalLatitude", "depth", "AOU", "Temperature")
 vals <- vals[complete.cases(vals),]
@@ -206,8 +180,8 @@ row.names(vals) <- NULL
 occsWdataSurface <- vals
 
 # Bottom Presences
-oxyVals <- extract(x = oxygenBottom, occurrences[,c("decimalLongitude", "decimalLatitude")])
-tempVals <- extract(x = temperatureBottom, occurrences[,c("decimalLongitude", "decimalLatitude")])
+oxyVals <- extract(x = oxygenBottom, occurrences[,c("decimalLongitude", "decimalLatitude")])[,2]
+tempVals <- extract(x = temperatureBottom, occurrences[,c("decimalLongitude", "decimalLatitude")])[,2]
 vals <- cbind(occurrences, oxyVals, tempVals)
 colnames(vals) <- c("decimalLongitude", "decimalLatitude", "depth", "AOU", "Temperature")
 vals <- vals[complete.cases(vals),]
@@ -231,19 +205,19 @@ tempLims <- quantile(occsWdataSurface$Temperature,c(0, 1))
 aouLims <- quantile(occsWdataSurface$AOU,c(0, 1))
 
 # Reclassify environmental bricks to presence/absence, surface
-temperaturePresence <- reclassify(temperature[[1]], 
-                                  rcl = c(-Inf,tempLims[[1]],0,
-                                          tempLims[[1]], tempLims[[2]], 1,
-                                          tempLims[[2]], Inf, 0))
-AOUpresence <- reclassify(oxygenSmooth[[1]], 
-                          rcl = c(-Inf, aouLims[[1]],0,
+temperaturePresence <- classify(temperature[[1]], 
+                                  rcl = matrix(c(-Inf,tempLims[[1]],0, 
+                                                 tempLims[[1]], tempLims[[2]], 1,
+                                                 tempLims[[2]], Inf, 0), 
+                                               ncol = 3, byrow = TRUE))
+AOUpresence <- classify(oxygenSmooth[[1]], 
+                          rcl = matrix(c(-Inf, aouLims[[1]],0,
                                   aouLims[[1]], aouLims[[2]], 1,
-                                  aouLims[[2]], Inf, 0))
+                                  aouLims[[2]], Inf, 0), ncol = 3, byrow = TRUE))
 
 # Put it all together, surface
 envelopeModelSurface <- temperaturePresence * AOUpresence
-studyRegion <- as(studyRegion, "Spatial")
-envelopeModelSurface <- raster::mask(raster::crop(envelopeModelSurface, studyRegion), 
+envelopeModelSurface <- mask(crop(envelopeModelSurface, studyRegion), 
                              mask = studyRegion)
 
 # Get limits, bottom
@@ -251,14 +225,14 @@ tempLims <- quantile(occsWdataBottom$Temperature,c(0, 1))
 aouLims <- quantile(occsWdataBottom$AOU,c(0, 1))
 
 # Reclassify environmental bricks to presence/absence, bottom
-temperaturePresence <- reclassify(temperatureBottom, 
-                                  rcl = c(-Inf,tempLims[[1]],0,
+temperaturePresence <- classify(temperatureBottom, 
+                                  rcl = matrix(c(-Inf,tempLims[[1]],0,
                                           tempLims[[1]], tempLims[[2]], 1,
-                                          tempLims[[2]], Inf, 0))
-AOUpresence <- reclassify(oxygenBottom, 
-                          rcl = c(-Inf, aouLims[[1]],0,
+                                          tempLims[[2]], Inf, 0), byrow = TRUE, ncol=3))
+AOUpresence <- classify(oxygenBottom, 
+                          rcl = matrix(c(-Inf, aouLims[[1]],0,
                                   aouLims[[1]], aouLims[[2]], 1,
-                                  aouLims[[2]], Inf, 0))
+                                  aouLims[[2]], Inf, 0), byrow = TRUE, ncol = 3))
 
 # Put it all together, bottom
 envelopeModelBottom <- temperaturePresence * AOUpresence
@@ -276,14 +250,16 @@ tempLims <- quantile(occsWdata3D$Temperature,c(0, 1))
 aouLims <- quantile(occsWdata3D$AOU,c(0, 1))
 
 # Reclassify environmental bricks to presence/absence
-temperaturePresence <- reclassify(temperature, 
-                                  rcl = c(-Inf,tempLims[[1]],0,
-                                          tempLims[[1]], tempLims[[2]], 1,
-                                          tempLims[[2]], Inf, 0))
-AOUpresence <- reclassify(oxygenSmooth, 
-                          rcl = c(-Inf, aouLims[[1]],0,
-                                  aouLims[[1]], aouLims[[2]], 1,
-                                  aouLims[[2]], Inf, 0))
+temperaturePresence <- classify(temperature, 
+                                  rcl = matrix(c(-Inf,tempLims[[1]],0,
+                                                 tempLims[[1]], tempLims[[2]], 1,
+                                                 tempLims[[2]], Inf, 0), 
+                                               byrow = TRUE, ncol = 3))
+AOUpresence <- classify(oxygenSmooth, 
+                          rcl = matrix(c(-Inf, aouLims[[1]],0,
+                                         aouLims[[1]], aouLims[[2]], 1,
+                                         aouLims[[2]], Inf, 0), 
+                                       byrow = TRUE, ncol = 3))
 
 # Put it all together
 envelopeModel3D <- temperaturePresence * AOUpresence
@@ -293,7 +269,7 @@ names(envelopeModel3D) <- names(temperature)
 
 ## ----plot 3D envelope model---------------------------------------------------
 # Get indices of model-relevant layers
-layerNames <- as.numeric(gsub("[X]", "", names(envelopeModel3D)))
+layerNames <- as.numeric(names(envelopeModel3D))
 occurrences$index <- unlist(lapply(occurrences$depth, 
                                    FUN = function(x) 
                                      which.min(abs(layerNames - x))))
@@ -302,4 +278,7 @@ indices <- sort(unique(occurrences$index))
 plotLayers(envelopeModel3D[[min(indices):max(indices)]],
            title = "Envelope Model of Luminous Hake,\n 20 to 700m",
            land = land)
+
+## ----cleanup temporary directory----------------------------------------------
+unlink(td, recursive = T)
 

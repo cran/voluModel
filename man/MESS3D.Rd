@@ -13,22 +13,22 @@ measurements from each voxel included in the data used to
 calibrate the model. Columns with names not corresponding to
 \code{projection} \code{list} items are ignored.}
 
-\item{projection}{A named \code{list} of \code{RasterBrick} objects for
+\item{projection}{A named \code{list} of \code{SpatRaster} objects for
 projection; names correspond to \code{calibration} column names.
-Each \code{RasterBrick} should have the same number of layers,
+Each \code{SpatRaster} should have the same number of layers,
 corresponding to vertical depth slices.}
 }
 \value{
-A \code{RasterBrick} of mess scores in each voxel;
-layer names correspond to layer names of first
-\code{RasterBrick} in \code{projection} \code{list}.
+A \code{SpatRaster} vector with MESS scores for each
+voxel; layer names correspond to layer names of first
+\code{SpatRaster} vector in \code{projection} \code{list}.
 }
 \description{
 Calculates multivariate environmental similarity
 surface based on model calibration and projection data
 }
 \details{
-\code{MESS3D} is a wrapper around \code{mess} from the \code{dismo}
+\code{MESS3D} is a wrapper around \code{MESS} from the \code{modEvA}
 package. It calculates MESS for each depth layer. Negative values
 indicate areas of extrapolation which should be interpreted with
 caution (see Elith \emph{et al}, 2010 in \emph{MEE}).
@@ -39,36 +39,36 @@ and background/pseudoabsence points used to calibrate an
 ecological niche model.
 }
 \examples{
-library(raster)
+library(terra)
 library(dplyr)
 
 # Create sample rasterBricks
-r1 <- raster(ncol=10, nrow=10)
+r1 <- rast(ncol=10, nrow=10)
 values(r1) <- 1:100
-r2 <- raster(ncol=10, nrow=10)
+r2 <- rast(ncol=10, nrow=10)
 values(r2) <- c(rep(20, times = 50), rep(60, times = 50))
-r3 <- raster(ncol=10, nrow=10)
+r3 <- rast(ncol=10, nrow=10)
 values(r3) <- 8
-envBrick1 <- brick(r1, r2, r3)
+envBrick1 <- c(r1, r2, r3)
 names(envBrick1) <- c(0, 10, 30)
 
-r1 <- raster(ncol=10, nrow=10)
+r1 <- rast(ncol=10, nrow=10)
 values(r1) <- 100:1
-r2 <- raster(ncol=10, nrow=10)
+r2 <- rast(ncol=10, nrow=10)
 values(r2) <- c(rep(10, times = 50), rep(20, times = 50))
-r3 <- raster(ncol=10, nrow=10)
+r3 <- rast(ncol=10, nrow=10)
 values(r3) <- c(rep(c(10,20,30,25), times = 25))
-envBrick2 <- brick(r1, r2, r3)
+envBrick2 <- c(r1, r2, r3)
 names(envBrick2) <- c(0, 10, 30)
 
 rastList <- list("temperature" = envBrick1, "salinity" = envBrick2)
 
 # Create test reference set
 set.seed(0)
-longitude <- sample(extent(envBrick1)[1]:extent(envBrick1)[2],
+longitude <- sample(ext(envBrick1)[1]:ext(envBrick1)[2],
                     size = 10, replace = FALSE)
 set.seed(0)
-latitude <- sample(extent(envBrick1)[3]:extent(envBrick1)[4],
+latitude <- sample(ext(envBrick1)[3]:ext(envBrick1)[4],
                    size = 10, replace = FALSE)
 set.seed(0)
 depth <- sample(0:35, size = 10, replace = TRUE)
@@ -88,6 +88,6 @@ The art of modelling range-shifting species.
 \emph{Methods in Ecology and Evolution}, 1, 330-342.
 }
 \seealso{
-\code{\link[dismo]{mess}}
+\code{\link[modEvA]{MESS}}
 }
 \keyword{modelDiagnostics}

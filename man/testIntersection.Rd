@@ -7,9 +7,9 @@
 testIntersection(a, b)
 }
 \arguments{
-\item{a}{The first \verb{Raster*} object}
+\item{a}{The first \code{SpatRaster} object}
 
-\item{b}{The second \verb{Raster*} object}
+\item{b}{The second \code{SpatRaster} object}
 }
 \value{
 A logical vector stating whether the two
@@ -23,17 +23,17 @@ template raster.
 }
 \examples{
 
-library(raster)
-rast1 <- raster(ncol=10, nrow=10)
+library(terra)
+rast1 <- rast(ncol=10, nrow=10)
 values(rast1) <- rep(0:1, 50)
 
-rast2 <- raster(ncol=10, nrow=10)
+rast2 <- rast(ncol=10, nrow=10)
 values(rast2) <- c(rep(0, 50), rep(1,50))
 
 testIntersection(rast1, rast2)
 
-rast1 <- crop(rast1, extent(10, 20, 30, 40))
-rast2 <- crop(rast2, extent(-20, -10, -40, -30))
+rast1 <- crop(rast1, ext(10, 20, 30, 40))
+rast2 <- crop(rast2, ext(-20, -10, -40, -30))
 
 testIntersection(rast1, rast2)
 

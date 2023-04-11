@@ -1,21 +1,20 @@
-library(raster)
-library(sp)
+library(terra)
 
 # voluModel:::columnParse() tests ----
 # Create sample raster
-r <- raster(ncol=10, nrow=10)
+r <- rast(ncol=10, nrow=10)
 values(r) <- 1:100
 
 # Create sample raster brick
-rBrick <- brick(r, r*10, r*100)
+rBrick <- c(r, r*10, r*100)
 names(rBrick) <- c(0, 10, 100)
 
 # Create test occurrences
 set.seed(0)
-longitude <- sample(extent(rBrick)[1]:extent(rBrick)[2],
+longitude <- sample(ext(rBrick)[1]:ext(rBrick)[2],
                     size = 10, replace = FALSE)
 set.seed(0)
-latitude <- sample(extent(rBrick)[3]:extent(rBrick)[4],
+latitude <- sample(ext(rBrick)[3]:ext(rBrick)[4],
                    size = 10, replace = FALSE)
 set.seed(0)
 depth <- sample(0:98, size = 10, replace = TRUE)
@@ -89,15 +88,15 @@ test_that("columnParse outputs as expected", {
 
 # downsample() tests ----
 # Create sample raster
-r <- raster(ncol=5, nrow=5)
+r <- rast(ncol=5, nrow=5)
 values(r) <- 1:25
 
 # Create test occurrences
 set.seed(0)
-longitude <- sample(extent(r)[1]:extent(r)[2],
+longitude <- sample(ext(r)[1]:ext(r)[2],
                     size = 5, replace = TRUE)
 set.seed(0)
-latitude <- sample(extent(r)[3]:extent(r)[4],
+latitude <- sample(ext(r)[3]:ext(r)[4],
                    size = 5, replace = TRUE)
 occurrences <- as.data.frame(cbind(longitude,latitude))
 
@@ -128,7 +127,7 @@ test_that("downsample special case checks", {
   expect_true(nrow(result) == 1)
 })
 
-# bottomRaster() tests ----
+# centerPointRasterTemplate() tests ----
 
 # Create point grid
 coords <- data.frame(x = rep(seq(1:5), times = 5),
@@ -143,11 +142,24 @@ dd <- data.frame(SURFACE = 1:25,
 dd$d25M[c(1:5, 18:25)] <- NA
 dd$d10M[c(3:4, 21:23)] <- NA
 dd$d5M[c(4, 15, 22)] <- NA
+dd <- cbind(coords, dd)
 
-# Create SpatialPointsDataFrame
-sp <- SpatialPointsDataFrame(coords = coords,
-                             data = dd)
+# Create SpatVector
+sp <- vect(dd, geom = c("x", "y"))
 
+test_that("centerPointRasterTemplate input warnings behave as expected", {
+  expect_error(centerPointRasterTemplate())
+  expect_warning(centerPointRasterTemplate(rawPointData = "a"))
+})
+
+test_that("centerPointRasterTemplate outputs as expected", {
+  result <- centerPointRasterTemplate(rawPointData = sp)
+  expect_true(class(result) == "SpatRaster")
+  expect_warning(values(result))
+  expect_true(suppressWarnings(sum(is.na(values(result)))) == 25)
+})
+
+# bottomRaster() tests ----
 test_that("bottomRaster input warnings behave as expected", {
   expect_error(bottomRaster())
   expect_warning(bottomRaster(rawPointData = "a"))
@@ -156,7 +168,7 @@ test_that("bottomRaster input warnings behave as expected", {
 result <- bottomRaster(rawPointData = sp)
 
 test_that("bottomRaster outputs as expected", {
-  expect_true(class(result) == "RasterLayer")
-  expect_true(cellStats(is.na(result), sum) == 0)
+  expect_true(class(result) == "SpatRaster")
+  expect_true(global(result, "isNA") == 0)
   expect_true(result[2] == 22)
 })

@@ -1,6 +1,6 @@
 library(rnaturalearth)
-library(raster)
 library(ggplot2)
+library(terra)
 
 occs <- read.csv(system.file("extdata/Steindachneria_argentea.csv",
                              package='voluModel'))
@@ -116,10 +116,10 @@ test_that("blendColor checks", {
 })
 
 # Set up tests for rasterComp function
-rast1 <- raster(ncol=10, nrow=10)
+rast1 <- rast(ncol=10, nrow=10)
 values(rast1) <- rep(0:1, 50)
 
-rast2 <- raster(ncol=10, nrow=10)
+rast2 <- rast(ncol=10, nrow=10)
 values(rast2) <- c(rep(0, 50), rep(1,50))
 
 test_that("rasterComp works", {
@@ -131,44 +131,54 @@ test_that("rasterComp works", {
   expect_warning(rasterComp(rast1 = rast1, rast1Name = "First Raster",
                             rast2 = rast2, rast2Name = "Second Raster",
                             col1 = "ukulele"))
-  expect_equal(class(rasterComp(rast1 = rast1)), "trellis")
-  expect_equal(class(rasterComp(rast2 = rast2)), "trellis")
-  expect_equal(class(rasterComp()), "trellis")
-  expect_equal(class(rasterComp(rast1 = rast1, rast2 = rast2)), "trellis")
-  expect_equal(class(rasterComp(rast1 = rast1, land = land)), "trellis")
-  expect_equal(class(rasterComp(rast2 = rast2, land = land)), "trellis")
-  expect_equal(class(rasterComp(land = land)), "trellis")
+  expect_equal(class(rasterComp(rast1 = rast1)), "recordedplot")
+  expect_equal(class(rasterComp(rast2 = rast2)), "recordedplot")
+  expect_equal(class(rasterComp(graticule = FALSE)), "recordedplot")
+  expect_equal(class(rasterComp(rast1 = rast1, rast2 = rast2)), "recordedplot")
+  expect_equal(class(rasterComp(rast1 = rast1, land = land)), "recordedplot")
+  expect_equal(class(rasterComp(rast2 = rast2, land = land)), "recordedplot")
+  expect_equal(class(rasterComp(land = land)), "recordedplot")
   expect_equal(class(rasterComp(rast1 = rast1, rast2 = rast2, land = land)),
-               "trellis")
-})
-
-test_that("diversityStack works", {
-  divStack <- diversityStack(list(rast1, rast2), template = rast2)
-  expect_true(grepl("Raster*", class(divStack)))
+               "recordedplot")
 })
 
 test_that("oneRasterPlot works", {
   divStack <- diversityStack(list(rast1, rast2), template = rast2)
   expect_warning(oneRasterPlot(rast = "a"))
   expect_warning(oneRasterPlot(rast = divStack, land = "a"))
-  expect_equal(class(oneRasterPlot(divStack)), "trellis")
-  expect_equal(class(oneRasterPlot(divStack, land = land)), "trellis")
+  expect_equal(class(oneRasterPlot(rast = divStack)), c("recordedplot"))
+  expect_equal(class(oneRasterPlot(divStack, land = land)), c("recordedplot"))
 })
 
-rast1 <- raster(ncol=10, nrow=10)
+rast1 <- rast(ncol=10, nrow=10)
 values(rast1) <- rep(0:1, 50)
 
-rast2 <- raster(ncol=10, nrow=10)
+rast2 <- rast(ncol=10, nrow=5)
+values(rast2) <- c(rep(0, 25), rep(1,25))
+rasterList <- list(rast1, rast2)
+
+test_that("diversityStack works", {
+  expect_warning(diversityStack(rasterList = "a"))
+  expect_warning(diversityStack(rasterList = rasterList, template = "b"))
+  divStack <- diversityStack(rasterList = rasterList, template = rast2)
+  expect_true(grepl("SpatRaster", class(divStack)))
+})
+
+rast1 <- rast(ncol=10, nrow=10)
+values(rast1) <- rep(0:1, 50)
+
+rast2 <- rast(ncol=10, nrow=10)
 values(rast2) <- c(rep(0, 50), rep(1,50))
 
-rast3 <- raster(ncol=10, nrow=10)
+rast3 <- rast(ncol=10, nrow=10)
 values(rast3) <- rep(c(1,0,0,1), 25)
-distBrick <- brick(rast1, rast2, rast3)
+distBrick <- c(rast1, rast2, rast3)
+names(distBrick) <- c(1,2,3)
 
 test_that("plotLayers works", {
   expect_warning(plotLayers(rast = "a"))
   expect_warning(plotLayers(rast = distBrick, land = "a"))
-  expect_equal(class(plotLayers(distBrick)), "trellis")
-  expect_equal(class(plotLayers(distBrick, land = land)), "trellis")
+  expect_equal(class(plotLayers(distBrick)), "recordedplot")
+  expect_equal(class(plotLayers(distBrick, land = land)), "recordedplot")
 })
 

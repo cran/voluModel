@@ -14,16 +14,17 @@ rasterComp(
   land = NA,
   landCol = "black",
   title = "A Raster Comparison",
+  graticule = TRUE,
   ...
 )
 }
 \arguments{
-\item{rast1}{A single \code{RasterLayer} showing the
+\item{rast1}{A single \code{SpatRaster} showing the
 distribution of the species corresponding to
 \code{rast1Name}. Should have values of 0 (absence)
 and 1 (presence). Can also be \code{NULL}.}
 
-\item{rast2}{A single \code{RasterLayer} showing the
+\item{rast2}{A single \code{SpatRaster} showing the
 distribution of the species corresponding to
 \code{rast2Name}. Should have values of 0 (absence)
 and 1 (presence). Must match the extent and
@@ -42,22 +43,24 @@ of occurrences, which will be color-coded to
 \code{occs2Col} in the resulting plot.}
 
 \item{land}{An optional coastline polygon shapefile
-of type \code{sf} to provide geographic context for the
-occurrence points.}
+of types \code{sf} or \code{SpatRaster} to provide geographic
+context for the occurrence points.}
 
 \item{landCol}{Color for land on map.}
 
 \item{title}{A title for the plot.}
 
+\item{graticule}{Do you want a grid of lon/lat lines?}
+
 \item{...}{Additional optional arguments to pass to
-\code{spplot} initial plot object.}
+\code{terra::plot()}.}
 }
 \value{
-A plot of class \code{trellis} overlaying mapped,
+A plot of class \code{recordedplot} overlaying mapped,
 semitransparent extents of the input rasters
 }
 \description{
-A convenient wrapper around \code{spplot}
+A convenient wrapper around \code{terra::plot}
 to generate formatted plots comparing two rasters.
 This is used in the context of voluModel to
 overlay semi-transparent distributions (coded as 1)
@@ -68,17 +71,17 @@ The extents of \code{rast1} and \code{rast2}
 must match.
 }
 \examples{
-library(raster)
-rast1 <- raster(ncol=10, nrow=10)
+library(terra)
+rast1 <- rast(ncol=10, nrow=10)
 values(rast1) <- rep(0:1, 50)
 
-rast2 <- raster(ncol=10, nrow=10)
+rast2 <- rast(ncol=10, nrow=10)
 values(rast2) <- c(rep(0, 50), rep(1,50))
 
 rasterComp(rast1 = rast1, rast2 = rast2)
 
 }
 \seealso{
-\code{\link[raster:spplot]{spplot}}
+\code{\link[terra:plot]{plot}}
 }
 \keyword{plotting}
