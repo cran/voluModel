@@ -1,6 +1,6 @@
 Package: voluModel
 Title: Modeling Species Distributions in Three Dimensions
-Version: 0.2.0
+Version: 0.2.1
 Authors@R: 
     c(person(given = "Hannah L.",
              family = "Owens",
@@ -34,11 +34,11 @@ Imports: dplyr, fields, ggplot2, ggtext, grDevices, methods, modEvA,
 Suggests: testthat (>= 3.0.0), nlme, knitr, covr, gridExtra, lattice,
         rmarkdown, rnaturalearth, rnaturalearthdata, tibble
 VignetteBuilder: knitr
-RoxygenNote: 7.2.3
+RoxygenNote: 7.3.0
 Config/testthat/edition: 3
 NeedsCompilation: no
-Packaged: 2023-04-11 12:24:59 UTC; Hannah
+Packaged: 2024-01-24 14:23:44 UTC; HannahOwens
 Author: Hannah L. Owens [aut, cre] (<https://orcid.org/0000-0003-0071-1745>),
   Carsten Rahbek [aut] (<https://orcid.org/0000-0003-4585-0300>)
 Repository: CRAN
-Date/Publication: 2023-04-11 13:20:02 UTC
+Date/Publication: 2024-01-24 14:50:06 UTC

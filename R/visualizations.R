@@ -166,10 +166,8 @@ pointMap <- function(occs, spName, land = NA,
     return(NULL)
   }
 
-  if(!any(is.na(land))){
-    if(!("sf" %in% class(land))){
-      land <- sf::st_as_sf(land)
-    }
+  if("SpatVector" %in% class(land)){
+    land <- sf::st_as_sf(land)
   }
 
   colVec <- c(ptCol, landCol, waterCol)
@@ -574,11 +572,11 @@ transpColor <- function(color, percent = 50) {
 #'
 #' @description Generates a blended color from two transparent colors
 #'
-#' @param color Anything that can be interpreted by `rgb`
+#' @param col1 Anything that can be interpreted by `rgb`
 #' as a color.
 #'
-#' @param percent A whole number between 0 and 100 specifying
-#' how transparent the color should be.
+#' @param col2 Anything that can be interpreted by `rgb`
+#' as a color.
 #'
 #' @return A `character` string with hex color, including
 #' adjustment for transparency.
@@ -765,7 +763,7 @@ rasterComp <- function(rast1 = NULL, rast2 = NULL,
 
   if(graticule){
     grat <- graticule(lon = seq(-180, 180, 10), lat = seq(-90,90,10), crs = crs(rast1))
-    plot(grat, col="gray50", add = TRUE)
+    plot(grat, col="gray50", labels = FALSE, add = TRUE)
   }
 
   if(!any(is.na(land))){
@@ -936,6 +934,18 @@ oneRasterPlot <- function(rast,
     option <- "plasma"
   }
 
+  if("plotLegend" %in% names(args)){
+    plotLegend <- args$plotLegend
+  } else{
+    plotLegend <- FALSE
+  }
+
+  if("legendMargin" %in% names(args)){
+    legendMargin <- args$legendMargin
+  } else{
+    legendMargin <- 3
+  }
+
   if("n" %in% names(args)){
     n <- args$n
   } else{
@@ -993,11 +1003,6 @@ oneRasterPlot <- function(rast,
     return(NULL)
   }
 
-  if(!is.character(title)){
-    warning(paste0("'title' must be a 'character' string.\n"))
-    return(NULL)
-  }
-
   if (!is.logical(verbose)) {
     warning(message("Argument 'verbose' is not of type 'logical'.\n"))
     return(NULL)
@@ -1023,17 +1028,29 @@ oneRasterPlot <- function(rast,
   }
 
   colVals <- seq(from = begin, to = end, by = (end-begin)/n)
+  colVals <- round(colVals, legendRound)
   colVals <- data.frame("from" = colVals[1:(length(colVals)-1)],
                         "to" = colVals[2:length(colVals)],
-                        "color" = viridisLite::viridis(n = n, alpha = 1, option = option))
+                        "color" = viridisLite::viridis(n = length(colVals)-1, alpha = 1, option = option))
+
+  if(is.na(title)){
+    adjustedMargin <- c(2,2,0,2)
+  } else{
+    adjustedMargin <- c(2,2,3,2)
+  }
+
+  if(plotLegend){
+    adjustedMargin[[4]] <- legendMargin
+  }
 
   plot(rast,
        col = colVals,
-       legend = FALSE, mar = c(2,2,3,2), axes = TRUE)
+       legend = plotLegend, mar = adjustedMargin,
+       axes = TRUE)
 
   if(graticule){
     grat <- graticule(lon = seq(-180, 180, 10), lat = seq(-90,90,10), crs = crs(rast))
-    plot(grat, col="gray50", add = TRUE)
+    plot(grat, col="gray50", labels = FALSE, add = TRUE)
   }
 
   if(!any(is.na(land))){
@@ -1043,14 +1060,19 @@ oneRasterPlot <- function(rast,
     plot(land, col = landCol, add = TRUE)
   }
 
-  legend(x = round(xmax(rast)) + 1, y = round(ymax(rast)) + 1,
-         title = varName,
-         bty = "n",
-         legend = paste0(round(colVals[,1], legendRound),
-                         " - ", round(colVals[,2], legendRound)),
-         fill = colVals[,3])
+  if(plotLegend){
+    legend(x = round(xmax(rast)) + 1,
+           yjust = 0,
+           title = varName,
+           bty = "n",
+           legend = paste0(round(colVals[,1], legendRound),
+                           " - ", round(colVals[,2], legendRound)),
+           fill = colVals[,3])
+  }
 
-  title(main = title, cex.main = 1.1)
+  if(!is.na(title)){
+    title(main = title, cex.main = 1.1)
+  }
 
   finalPlot <- recordPlot()
 
@@ -1173,7 +1195,7 @@ plotLayers <- function(rast,
 
   if(graticule){
     grat <- graticule(lon = seq(-180, 180, 10), lat = seq(-90,90,10), crs = crs(rast))
-    plot(grat, col="gray50", add = TRUE)
+    plot(grat, col="gray50", labels = FALSE, add = TRUE)
   }
 
   if(!any(is.na(land))){

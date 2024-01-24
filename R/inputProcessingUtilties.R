@@ -262,14 +262,15 @@ bottomRaster <- function(rawPointData){
                         FUN = function(x) tail(x[!is.na(x)],1))
   rawPointData$Bottom <- bottomSample
 
-  bRaster <- terra::rasterize(x = rawPointData, y = template, field = "Bottom")
+  bRaster <- rasterize(x = rawPointData, y = template, field = "Bottom")
   return(bRaster)
 }
 
 #' @title Center Point Raster Template
 #'
-#' @description Samples deepest depth values from a
-#' `SpatVector` point object and generates a `SpatRaster`.
+#' @description Creates a `SpatRaster` template from a
+#' `SpatVector` point object in which the raster cells
+#' are centered on the vector points.
 #'
 #' @param rawPointData A `SpatVector` object with points
 #' that will represent the center of each cell in the output
