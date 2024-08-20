@@ -83,8 +83,7 @@ pointCompMap(occs1 = occs, occs2 = occsClean,
 
 ## ----environmental background sampling, warning=FALSE, eval = FALSE-----------
 #  backgroundSamplingRegions <- marineBackground(occsClean, buff = 1000000)
-#  backgroundSamplingRegions <- sf::st_as_sf(backgroundSamplingRegions)
-#  backgroundSamplingRegions <- sf::st_transform(backgroundSamplingRegions, crs(land))
+#  crs(backgroundSamplingRegions) <- crs(land)
 #  plot(backgroundSamplingRegions, border = F, col = "gray",
 #       main = "Points and Background Sampling",
 #       axes = T)

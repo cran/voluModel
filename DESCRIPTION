@@ -1,6 +1,6 @@
 Package: voluModel
 Title: Modeling Species Distributions in Three Dimensions
-Version: 0.2.1
+Version: 0.2.2
 Authors@R: 
     c(person(given = "Hannah L.",
              family = "Owens",
@@ -29,16 +29,16 @@ URL: https://hannahlowens.github.io/voluModel/
 BugReports: https://github.com/hannahlowens/voluModel/issues
 Encoding: UTF-8
 Depends: R (>= 4.0.0)
-Imports: dplyr, fields, ggplot2, ggtext, grDevices, methods, modEvA,
-        rangeBuilder (>= 2.0), terra, viridisLite, sf
+Imports: dplyr, fields, ggplot2, ggtext, grDevices, methods, metR,
+        modEvA, rangeBuilder (>= 2.0), terra, viridisLite, sf
 Suggests: testthat (>= 3.0.0), nlme, knitr, covr, gridExtra, lattice,
         rmarkdown, rnaturalearth, rnaturalearthdata, tibble
 VignetteBuilder: knitr
-RoxygenNote: 7.3.0
+RoxygenNote: 7.3.2
 Config/testthat/edition: 3
 NeedsCompilation: no
-Packaged: 2024-01-24 14:23:44 UTC; HannahOwens
+Packaged: 2024-08-20 10:11:00 UTC; HannahOwens
 Author: Hannah L. Owens [aut, cre] (<https://orcid.org/0000-0003-0071-1745>),
   Carsten Rahbek [aut] (<https://orcid.org/0000-0003-4585-0300>)
 Repository: CRAN
-Date/Publication: 2024-01-24 14:50:06 UTC
+Date/Publication: 2024-08-20 22:50:01 UTC
