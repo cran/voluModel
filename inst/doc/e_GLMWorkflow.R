@@ -1,5 +1,5 @@
 ## ----setup, include=FALSE-----------------------------------------------------
-knitr::opts_chunk$set(echo = TRUE, error = FALSE, fig.retina = 1, dpi = 80)
+knitr::opts_chunk$set(echo = TRUE, error = FALSE, fig.retina = 1, dpi = 100)
 
 ## ----packages, warning=FALSE--------------------------------------------------
 library(voluModel) # Because of course
@@ -81,22 +81,19 @@ pointCompMap(occs1 = occs, occs2 = occsClean,
              spName = "Steindachneria argentea", 
              land = land, verbose = FALSE)
 
-## ----environmental background sampling, warning=FALSE, eval = FALSE-----------
-#  backgroundSamplingRegions <- marineBackground(occsClean, buff = 1000000)
-#  crs(backgroundSamplingRegions) <- crs(land)
-#  plot(backgroundSamplingRegions, border = F, col = "gray",
-#       main = "Points and Background Sampling",
-#       axes = T)
-#  plot(land, col = "black", add = T)
-#  points(occsClean[,c("decimalLongitude", "decimalLatitude")],
-#         pch = 20, col = "red", cex = 1.5)
-
-## ----environmental background sampling hidden, warning=FALSE, echo=FALSE------
-backgroundSamplingRegions <- vect(system.file("extdata/backgroundSamplingRegions.shp",
-                              package='voluModel'))
-
-## ----plot study region plot, echo=FALSE, out.width = '100%', out.height= '100%'----
-knitr::include_graphics("PointsAndTrainingRegion.png")
+## ----environmental background sampling, warning=FALSE, eval = T---------------
+backgroundSamplingRegions <- marineBackground(occsClean,
+                                buff = 1000000,
+                                clipToOcean = TRUE,
+                                alpha = 1,
+                                partCount = 1)
+crs(backgroundSamplingRegions) <- crs(land)
+plot(backgroundSamplingRegions, border = F, col = "gray",
+     main = "Points and Background Sampling",
+     axes = T)
+plot(land, col = "black", add = T)
+points(occsClean[,c("decimalLongitude", "decimalLatitude")], 
+       pch = 20, col = "red", cex = 1.5)
 
 ## ----presence sampling--------------------------------------------------------
 # Presences

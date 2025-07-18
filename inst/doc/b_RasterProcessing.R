@@ -1,5 +1,5 @@
 ## ----setup, include=FALSE-----------------------------------------------------
-knitr::opts_chunk$set(echo = TRUE, error = FALSE, fig.retina = 1, dpi = 80)
+knitr::opts_chunk$set(echo = TRUE, error = FALSE, fig.retina = 1, dpi = 100)
 
 ## ----load packages, message=FALSE, warning=FALSE------------------------------
 library(voluModel) # Since this is the package this vignette is about.
@@ -17,7 +17,7 @@ unzip(system.file("extdata/woa18_decav_t00mn01_cropped.zip",
 temperature <- vect(paste0(td, "/temperature/woa18_decav_t00mn01_cropped.shp"))
 
 # Looking at the dataset
-head(temperature)
+as.data.frame(temperature[1:5,1:10])
 
 # Plotting the dataset
 layout(matrix(c(1, 2), ncol=2, byrow=TRUE), widths=c(4, 1))
@@ -36,31 +36,28 @@ depths <- as.numeric(gsub(depths[-1], pattern = "[d,M]", replacement = ""))
 plot(0, xlim = c(0,1), ylim = c(0-max(depths), 0), axes=FALSE, type = "n", xlab = "", ylab = "Depth Intervals (m)")
 axis(2, at = 0-depths, labels = depths)
 
-## ----temperature processing, eval=FALSE---------------------------------------
-#  # Creating a bottom raster
-#  temperatureBottom <- bottomRaster(temperature)
-#  
-#  # Creating a SpatRaster vector
-#  template <- centerPointRasterTemplate(temperature)
-#  tempTerVal <- rasterize(x = temperature, y = template, field = names(temperature))
-#  
-#  # Get names of depths
-#  envtNames <- gsub("[d,M]", "", names(temperature))
-#  envtNames[[1]] <- "0"
-#  names(tempTerVal) <- envtNames
-#  temperature <- tempTerVal
-#  rm(tempTerVal)
-#  
-#  # How do these files look?
-#  par(mfrow=c(1,2))
-#  p1 <- oneRasterPlot(temperature[[1]], land = land, landCol = "black",
-#                title= "Surface Temperature (C)")
-#  
-#  p2 <- oneRasterPlot(temperatureBottom,land = land, landCol = "black",
-#                title = "Bottom Temperature (C)")
+## ----temperature processing, eval=TRUE----------------------------------------
+# Creating a bottom raster
+temperatureBottom <- bottomRaster(temperature)
 
-## ----temperature plot, echo=FALSE, out.width = '100%', out.height= '100%'-----
-knitr::include_graphics("TemperatureTopBottom.png")
+# Creating a SpatRaster vector
+template <- centerPointRasterTemplate(temperature)
+tempTerVal <- rasterize(x = temperature, y = template, field = names(temperature))
+
+# Get names of depths
+envtNames <- gsub("[d,M]", "", names(temperature))
+envtNames[[1]] <- "0"
+names(tempTerVal) <- envtNames
+temperature <- tempTerVal
+rm(tempTerVal)
+
+# How do these files look?
+par(mfrow=c(1,2))
+p1 <- oneRasterPlot(temperature[[1]], land = land, landCol = "black", 
+              title= "Surface Temperature (C)")
+
+p2 <- oneRasterPlot(temperatureBottom,land = land, landCol = "black", 
+              title = "Bottom Temperature (C)")
 
 ## ----environmental data loading oxygen, eval=T, message=FALSE, warning=FALSE, asis=T----
 td <- tempdir()
@@ -68,47 +65,45 @@ unzip(system.file("extdata/woa18_all_A00mn01_cropped.zip",
                   package = "voluModel"),
       exdir = paste0(td, "/oxygen"), junkpaths = T)
 
-oxygen <- vect(paste0(td, "/oxygen/woa18_all_A00mn01_cropped.shp"))
+oxygen <- vect(paste0(td, "/oxygen/woa18_all_A00mn01_cropped.shp")) 
 
 plot(oxygen, main = "Distribution of voluModel subset of WOA AOU 2018",
      pch = 20, col = "red", xlim = ext[1:2], ylim = ext[3:4], cex = .6)
 plot(land, col = "black", add = T)
 
-## ----interpolate oxygen, warning=FALSE, eval = F------------------------------
-#  # Creating a SpatRaster vector
-#  oxygen <- rasterize(x = oxygen, y = template,
-#                     field = names(oxygen)) #Uses same raster template as temperature
-#  
-#  for (i in 1:nlyr(oxygen)){
-#    oxygen[[i]] <- interpolateRaster(oxygen[[i]], lon.lat = T, fast = T, aRange = 5) #Thin plate spline interpolation
-#    oxygen[[i]] <- crop(mask(x = oxygen[[i]],
-#                             mask = temperature[[i]]),
-#                        temperature[[i]])
-#  }
-#  
-#  # Change names to match tempT
-#  names(oxygen) <- envtNames
+## ----interpolate oxygen, warning=FALSE, eval = T------------------------------
+# Creating a SpatRaster vector for the first 10 depth layers
+oxygen <- oxygen[,1:10] # Remove this line if you want to process the whole file
+oxygen <- rasterize(x = oxygen, y = template,
+                   field = names(oxygen)) #Uses same raster template as temperature
 
-## ----smoothing oxygen, eval=FALSE---------------------------------------------
-#  # Smoothing tempO and saving
-#  oxygenSmooth <- oxygen
-#  for (i in 1:nlyr(oxygenSmooth)){
-#    oxygenSmooth[[i]] <- smoothRaster(oxygenSmooth[[i]], lon.lat = T) #Thin plate spline interpolation
-#    oxygenSmooth[[i]] <- crop(mask(x = oxygenSmooth[[i]], mask = temperature[[i]]), temperature[[i]])
-#  }
-#  
-#  # Change names to match tempT and save
-#  names(oxygenSmooth) <- names(oxygen)
-#  oxygenSmooth <- oxygenSmooth
-#  
-#  par(mfrow=c(1,2))
-#  p3 <- oneRasterPlot(oxygen[[1]], land = land, landCol = "black",
-#                title= "Surface Apparent Oxygen Utilization (µmol/kg),\ninterpolated")
-#  p4 <- oneRasterPlot(oxygenSmooth[[1]], land = land, landCol = "black",
-#       title = "Bottom Apparent Oxygen Utilization (µmol/kg),\ninterpolated and smoothed")
+for (i in 1:nlyr(oxygen)){ 
+  oxygen[[i]] <- interpolateRaster(oxygen[[i]], lon.lat = T, fast = T, aRange = 30) #Thin plate spline interpolation
+  oxygen[[i]] <- crop(mask(x = oxygen[[i]], 
+                           mask = temperature[[i]]), 
+                      temperature[[i]])
+}
 
-## ----AOU plot, echo=FALSE, out.width = '100%', out.height= '100%'-------------
-knitr::include_graphics("AOUInterpAndSmooth.png")
+# Change names to match tempT
+names(oxygen) <- envtNames[1:nlyr(oxygen)]
+
+## ----smoothing oxygen, eval=TRUE----------------------------------------------
+# Smoothing tempO and saving
+oxygenSmooth <- oxygen
+for (i in 1:nlyr(oxygenSmooth)){
+  oxygenSmooth[[i]] <- smoothRaster(oxygenSmooth[[i]], lon.lat = T) #Thin plate spline interpolation
+  oxygenSmooth[[i]] <- crop(mask(x = oxygenSmooth[[i]], mask = temperature[[i]]), temperature[[i]])
+}
+
+# Change names to match tempT and save
+names(oxygenSmooth) <- names(oxygen)
+oxygenSmooth <- oxygenSmooth
+
+par(mfrow=c(1,2))
+p3 <- oneRasterPlot(oxygen[[1]], land = land, landCol = "black", 
+              title= "Surface Apparent Oxygen Utilization\n(µmol/kg), interpolated")
+p4 <- oneRasterPlot(oxygenSmooth[[1]], land = land, landCol = "black",
+     title = "Surface Apparent Oxygen Utilization\n(µmol/kg), interpolated and smoothed")
 
 ## ----cleanup temporary directory----------------------------------------------
 unlink(td, recursive = T)

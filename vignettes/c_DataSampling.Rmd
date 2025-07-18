@@ -21,7 +21,7 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, error = FALSE, fig.retina = 1, dpi = 80)
+knitr::opts_chunk$set(echo = TRUE, error = FALSE, fig.retina = 1, dpi = 100)
 ```
 
 # Introduction
@@ -53,14 +53,6 @@ occurrences <- occs %>%
   dplyr::filter(depth %in% 1:2000)
 ```
 
-```{r occurrence dataset plotting code, message=FALSE, warning = FALSE, eval=TRUE, echo = FALSE}
-# Map occurrences
-land <- rnaturalearth::ne_countries(scale = "small", returnclass = "sf")[1]
-pointMap(occs = occurrences, ptCol = "orange", landCol = "black",
-             spName = "Steindachneria argentea", ptSize = 3,
-             land = land)
-```
-
 The environmental dataset I will use as an example is temperature (Locarnini *et al.*, 2018) from the World Ocean Atlas (WOA; Garcia *et al.*, 2019). I have chosen to focus on temperature for simple illustrative purposes--we recommend you explore additional variables from the World Ocean Atlas and other sources. These data are supplied by the World Ocean Atlas as point shapefiles; the version supplied here has been cropped between -110 and -40 longitude and between -5 and 50 latitude to make it more memory-efficient. 
 
 This chunk of code loads the example data shapefile, which results in a `SpatVector`:
@@ -74,10 +66,10 @@ unzip(system.file("extdata/woa18_decav_t00mn01_cropped.zip",
 temperature <- vect(paste0(td, "/temperature/woa18_decav_t00mn01_cropped.shp"))
 
 # Looking at the dataset
-head(temperature)
+as.data.frame(temperature[1:5,1:10])
 ```
 
-As you can see, each point in the `SpatVector` is a line in the associated `data.frame`; each column is a depth layer at that point--"d5M" translates to "5 meters deep". For more details on how to process environmental data, see [the raster data tutorial](https://hannahlowens.github.io/voluModel/articles/b_RasterProcessing.html). This next chunk converts the `SpatVector` to a multi-layer `SpatRaster`; the layers of the multi-layer `SpatRaster` are then named the same as the column names of the `SpatVector`. I strip the "d" and "M" from the column names so they are a little easier to use as depth coordinates. Note that `R` will not allow the raster names to be numeric, so it adds an "X" to the beginning of each column name. Don't worry about this--`voluModel` can handle numbers preceded by "X"s without user intervention.
+As you can see, each point in the `SpatVector` is a line in the associated `data.frame`; each column is a depth layer at that point--"d5M" translates to "5 meters deep". For more details on how to process environmental data, see [the raster data tutorial](https://hannahlowens.github.io/voluModel/articles/b_RasterProcessing.html). This next chunk converts the `SpatVector` to a multi-layer `SpatRaster`; the layers of the multi-layer `SpatRaster` are then named the same as the column names of the `SpatVector`. I strip the "d" and "M" from the column names so they are a little easier to use as depth coordinates. 
 
 ```{r temperature to compatible RasterBrick}
 # Creating a SpatRaster vector
@@ -89,9 +81,6 @@ envtNames <- gsub("[d,M]", "", names(temperature))
 envtNames[[1]] <- "0"
 names(tempTerVal) <- envtNames
 temperature <- tempTerVal
-
-# Here's a sampling of depth plots from the 102 depth layers available
-plot(temperature[[c(1, 50)]])
 
 rm(tempTerVal)
 ```
@@ -108,7 +97,7 @@ xyzSample(occs = occsTest, envBrick = temperature)
 rm(occsTest)
 ```
 
-One optional step in a niche modeling workflow is to down-sample occurrence data to the same resolution as the environmental data. We do this to avoid over-fitting the model due to biased sampling. The next chunk of code downsamples occurrence points so that there is only one per voxel (i.e. 3D pixel) of environmental data. It does this by looping through each layer of the multi-layer `SpatRaster`, selecting the occurrence points with depths closest to the depths represented by the corresponding layer in the `SpatRaster` vector. I then downsample these points using `voluModel`'s `downsample()` function.
+One common step in a niche modeling workflow is to down-sample occurrence data to the same resolution as the environmental data. We do this to avoid over-fitting the model due to biased sampling. The next chunk of code downsamples occurrence points so that there is only one per voxel (i.e. 3D pixel) of environmental data. It does this by looping through each layer of the multi-layer `SpatRaster`, selecting the occurrence points with depths closest to the depths represented by the corresponding layer in the `SpatRaster` vector. I then downsample these points using `voluModel`'s `downsample()` function.
 
 ```{r downsample to voxel, eval=TRUE, warning=FALSE, message=FALSE}
 # Gets the layer index for each occurrence by matching to depth
@@ -132,6 +121,8 @@ print(paste0("Original number of points: ", nrow(occs), "; number of downsampled
 The resampled points returned by `downsample()` are horizontally centered in each voxel. The red dots in the plot show occurrences from the original dataset; the orange dots show the downsampled dataset. Not all of the orange dots may be visible underneath the red dots.
 
 ```{r plot downsample, warning=FALSE}
+land <- rnaturalearth::ne_countries(scale = "small", returnclass = "sf")[1]
+
 pointCompMap(occs1 = occs, occs2 = occurrences, 
              occs1Name = "original", occs2Name = "cleaned", 
              spName = "Steindachneria argentea", 
@@ -161,48 +152,39 @@ We designed `marineBackground()` as a wrapper around \code{\link[rangeBuilder:ge
 
 `getDynamicAlphaHull()`, which is run within `marineBackground()` generates a polygon (or polygons) that can be used as a training region by fitting an alpha hull (or hulls) around an occurrence dataset. Alpha is a parameter that controls the complexity of the polygon(s) that is being fit around the occurrences. `getDynamicAlphaHull()` adjusts the alpha parameter iteratively, until it meets criteria the user can set via the arguments `fraction`, which is the minimum fraction of occurrences that must be contained within the polygon(s), `partCount`, which is the maximum number of polygons generated to fit the data, and `buff`, which is the permissible distance from a point to the edge of a polyon in meters. `marineBackground()` takes these and many of the same other arguments as `getDynamicAlphaHull()`. Here's how it works.
 
-```{r alpha hull demonstration, message=FALSE, warning=FALSE, eval=FALSE}
+```{r alpha hull demonstration, message=FALSE, warning=FALSE, eval=T}
 trainingRegion <- marineBackground(occurrences, 
-                                fraction = 1, partCount = 1, buff = 1000000,
-                                clipToOcean = F)
+                                   fraction = 1, 
+                                   partCount = 1, 
+                                   buff = 1000000,
+                                   clipToOcean = F)
 plot(trainingRegion, border = F, col = "gray",
-     main = "100% Points, Max 1 Polygon Permitted, 100 km Buffer",
+     main = "100% Points,\nMax 1 Polygon Permitted, 100 km Buffer",
      axes = T)
 plot(land, col = "black", add = T)
 points(occurrences[,c("decimalLongitude", "decimalLatitude")], 
        pch = 20, col = "red", cex = 1.5)
-```
-
-```{r plot alpha hull demonstration, echo=FALSE, fig.width=7}
-knitr::include_graphics("alphaHullDemonstration-1.png", )
 ```
 
 What parameters you choose to fit the alpha hull will depend on the biology of the organism you are trying to model (e.g. you may choose a much smaller buffer for a sessile organism than you would for a highly vagile migratory species), your data, and the particulars of your study system and the geography of your study area. You may need to experiment to find something that looks sensible. If you do not provide a pre-defined buffer, `marineBackground()` will calculate a buffer that is the mean of the top and bottom 10% of distances between points in the dataset.
 
 You may have noticed that the training regions in the above examples include some areas of the Pacific where the species has not been observed, and cannot access. This could cause problems if it is used to train your model. You *could* delete this area by hand in your favorite GIS software, OR you could change `clipToOcean` to `TRUE` in `marineBackground()`, and any polygon fragments that do not contain an occurrence will be deleted automatically. This is a key difference from `getDynamicAlphaHull()`.
 
-```{r clipToOcean demo, message=FALSE, warning=FALSE, eval=F}
+```{r clipToOcean demo, message=FALSE, warning=FALSE, eval=T}
 trainingRegion <- marineBackground(occurrences, 
                                    buff = 1000000, 
                                    clipToOcean = T)
 plot(trainingRegion, border = F, col = "gray",
-     main = "100 km Buffer, Clipped to Occupied Polygon",
+     main = "100 km Buffer,\nClipped to Occupied Polygon",
      axes = T)
 plot(land, col = "black", add = T)
 points(occurrences[,c("decimalLongitude", "decimalLatitude")], 
        pch = 20, col = "red", cex = 1.5)
 ```
 
-```{r plot clipToOcean demo, echo=FALSE}
-trainingRegion <- vect(system.file("extdata/backgroundSamplingRegions.shp",
-                              package='voluModel'))
-
-knitr::include_graphics("clipToOceanDemo-1.png")
-```
-
 The last major difference between `marineBackground()` and `getDynamicAlphaHull()` is how the functions handle training regions that are adjacent to the antimeridian (i.e. 180° E or W). `getDynamicAlphaHull()` truncates polygons at this line, which can lead to some strange-looking training areas or fatal errors. `marineBackground()`, on the other hand, wraps polygons across the meridian and merges them if they overlap. For this example, I am going to manipulate the longitudinal coordinates of our Luminous Hake dataset to generate a quick fictional example.
 
-```{r meridian wrap demo, warning=FALSE, message=FALSE, eval=F}
+```{r meridian wrap demo, warning=FALSE, message=FALSE, eval=T}
 # Fictional example occurrences
 pacificOccs <- occurrences
 pacificOccs$decimalLongitude <- pacificOccs$decimalLongitude - 100
@@ -214,18 +196,15 @@ for (i in 1:length(pacificOccs$decimalLongitude)){
 
 # marine Background
 pacificTrainingRegion <- marineBackground(pacificOccs, 
-                                          fraction = 0.95, partCount = 3, 
+                                          fraction = 0.95, partCount = 3,
+                                          buff = 1000000,
                                           clipToOcean = T)
 plot(pacificTrainingRegion, border = F, col = "gray",
-     main = "marineBackground Antimeridian Wrap",
+     main = "marineBackground\nAntimeridian Wrap",
      axes = T)
 plot(land, col = "black", add = T)
 points(pacificOccs[,c("decimalLongitude", "decimalLatitude")], 
        pch = 20, col = "red", cex = 1.5)
-```
-
-```{r plot meridian wrap demo, echo=FALSE}
-knitr::include_graphics("meridianWrapDemo-1.png")
 ```
 
 # Background Data Extraction
@@ -324,7 +303,7 @@ Froese, R. and D. Pauly. Editors. 2020. FishBase. World Wide Web electronic publ
 
 Gall L (2021). Vertebrate Zoology Division - Ichthyology, Yale Peabody Museum. Yale University Peabody Museum. DOI: 10.15468/mgyhok. Accessed via GBIF on 2020-10-13.
 
-García, CB, and Duarte, LO, 'Columbian Caribbean Sea', in J.H. Nicholls (comp.) HMAP Data Pages https://oceanspast.org/hmap_db.php Accessed via OBIS on 2020-11-04.   
+García, CB, and Duarte, LO, 'Columbian Caribbean Sea', in J.H. Nicholls (comp.) HMAP Data Pages https://doi.org/10.6084/m9.figshare.23504046 Accessed via OBIS on 2020-11-04.   
 
 Garcia HE, Weathers K, Paver CR, Smolyar I, Boyer TP, Locarnini RA, Zweng MM, Mishonov AV, Baranova OK, Seidov D, Reagan JR (2018). World Ocean Atlas 2018, Volume 3: Dissolved Oxygen, Apparent Oxygen Utilization, and Oxygen Saturation. A Mishonov Technical Ed.; NOAA Atlas NESDIS 83, 38pp.
 

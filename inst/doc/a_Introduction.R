@@ -1,5 +1,5 @@
 ## ----setup, include=FALSE-----------------------------------------------------
-knitr::opts_chunk$set(echo = TRUE, error = FALSE, fig.retina = 1, dpi = 80)
+knitr::opts_chunk$set(echo = TRUE, error = FALSE, fig.retina = 1, dpi = 100)
 
 ## ----packages, message=FALSE, warning=FALSE-----------------------------------
 library(voluModel) # Because of course
@@ -45,17 +45,14 @@ names(tempTerVal) <- envtNames
 temperature <- tempTerVal
 rm(tempTerVal)
 
-## ----plotting temperature, eval = FALSE---------------------------------------
-#  # How do these files look?
-#  par(mfrow=c(1,2))
-#  p1 <- oneRasterPlot(temperature[[1]], land = land, landCol = "black",
-#                title= "Surface Temperature (C)")
-#  
-#  p2 <- oneRasterPlot(temperatureBottom,land = land, landCol = "black",
-#                title = "Bottom Temperature (C)")
+## ----plotting temperature, eval = TRUE----------------------------------------
+# How do these files look?
+par(mfrow=c(1,2))
+p1 <- oneRasterPlot(temperature[[1]], land = land, landCol = "black", 
+              title= "Surface Temperature (C)")
 
-## ----temperature plot, echo=FALSE, out.width = '100%', out.height= '100%'-----
-knitr::include_graphics("TemperatureTopBottom.png")
+p2 <- oneRasterPlot(temperatureBottom,land = land, landCol = "black", 
+              title = "Bottom Temperature (C)")
 
 ## ----loading oxygen data, message=FALSE, warning=FALSE, include=TRUE----------
 # Oxygen processing, pre-baked to save time
@@ -65,15 +62,12 @@ oxygenBottom <- rast(system.file("extdata/oxygenBottom.tif",
                                  package="voluModel"))
 names(oxygenSmooth) <- names(temperature)
 
-## ----oxygen plotting, echo=TRUE, eval = FALSE, message=FALSE, warning=FALSE----
-#  par(mfrow=c(1,2))
-#  p3 <- oneRasterPlot(oxygenSmooth[[1]], land = land, landCol = "black",
-#                title= "Surface Apparent Oxygen Utilization (µmol/kg),\ninterpolated and smoothed")
-#  p4 <- oneRasterPlot(oxygenBottom, land = land, landCol = "black",
-#       title = "Bottom Apparent Oxygen Utilization (µmol/kg),\ninterpolated and smoothed")
-
-## ----oxygen plot, echo=FALSE, out.width = '100%', out.height= '100%'----------
-knitr::include_graphics("OxygenTopBottom.png")
+## ----oxygen plotting, echo=TRUE, eval = TRUE, message=FALSE, warning=FALSE----
+par(mfrow=c(1,2))
+p3 <- oneRasterPlot(oxygenSmooth[[1]], land = land, landCol = "black", 
+              title= "Surface Apparent Oxygen Utilization (µmol/kg),\ninterpolated and smoothed")
+p4 <- oneRasterPlot(oxygenBottom, land = land, landCol = "black",
+     title = "Bottom Apparent Oxygen Utilization (µmol/kg),\ninterpolated and smoothed")
 
 ## ----occurrence and depth matchup---------------------------------------------
 # Gets the layer index for each occurrence by matching to depth
@@ -132,7 +126,7 @@ allOxy$Oxygen <- as.numeric(allOxy$Oxygen)
 # Plotting
 groups <- c("X, Y,\nSurface", "X, Y,\nBottom", "X, Y,\nZ")
 tempPlot <- ggplot(allTemp, aes(x=Group, y=Temperature)) + 
-  geom_boxplot(fill="#b2182b", notch = TRUE) +
+  geom_boxplot(fill="#b2182b", notch = FALSE) +
   theme_classic(base_size = 15) +
   theme(axis.title.x = element_blank(), 
         text = element_text(family = "Arial"), 
@@ -141,7 +135,7 @@ tempPlot <- ggplot(allTemp, aes(x=Group, y=Temperature)) +
   ylab("Temperature (C)")
 
 oxyPlot <- ggplot(allOxy, aes(x=Group, y=Oxygen)) + 
-  geom_boxplot(fill="#2166ac", notch = TRUE) +
+  geom_boxplot(fill="#2166ac", notch = FALSE) +
   theme_classic(base_size = 15) +
   theme(axis.title.x = element_blank(), 
         text = element_text(family = "Arial"), 
@@ -151,23 +145,20 @@ oxyPlot <- ggplot(allOxy, aes(x=Group, y=Oxygen)) +
 
 gridExtra::grid.arrange(tempPlot, oxyPlot, nrow = 1)
 
-## ----study region, message=FALSE, warning=FALSE, eval=FALSE-------------------
-#  studyRegion <- marineBackground(occurrences, buff = 1000000, clipToOcean = TRUE)
-#  landVect <- vect(land)
-#  landVect <- terra::project(landVect, y = studyRegion)
-#  plot(studyRegion, border = F, col = "gray",
-#       main = "Points and Background Sampling",
-#       axes = T)
-#  plot(landVect, col = "black", add = T)
-#  points(occurrences[,c("decimalLongitude", "decimalLatitude")],
-#         pch = 20, col = "red", cex = 1.5)
-
-## ----study region hidden, message=FALSE, warning=FALSE, eval=TRUE, echo=FALSE----
-studyRegion <- vect(system.file("extdata/backgroundSamplingRegions.shp",
-                                package='voluModel'))
-
-## ----plot study region, echo=FALSE, out.width = '100%', out.height= '100%'----
-knitr::include_graphics("PointsAndTrainingRegion.png")
+## ----study region, message=FALSE, warning=FALSE-------------------------------
+studyRegion <- marineBackground(occurrences,
+                                buff = 1000000,
+                                clipToOcean = TRUE,
+                                alpha = 1,
+                                partCount = 1)
+landVect <- vect(land)
+landVect <- terra::project(landVect, y = studyRegion)
+plot(studyRegion, border = F, col = "gray",
+     main = "Points and Background Sampling",
+     axes = T)
+plot(landVect, col = "black", add = T)
+points(occurrences[,c("decimalLongitude", "decimalLatitude")], 
+       pch = 20, col = "red", cex = 1.5)
 
 ## ----sampling-----------------------------------------------------------------
 # Surface Presences

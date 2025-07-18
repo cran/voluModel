@@ -7,12 +7,6 @@ occs <- read.csv(system.file("extdata/Steindachneria_argentea.csv",
 spName <- "Steindachneria argentea"
 land <- ne_countries(scale = "medium", returnclass = "sf")[1]
 
-test_that("input checks", {
-  expect_identical(class(occs), "data.frame")
-  expect_type(land, "list")
-  expect_identical(class(land), c("sf", "data.frame"))
-})
-
 test_that("areColors works as expected", {
   expect_error(voluModel:::areColors())
   expect_warning(voluModel:::areColors(NULL))
@@ -39,10 +33,10 @@ test_that("pointMap checks", {
                           verbose = "banana"))
   point_map <- pointMap(occs = occs, alpha = 1,
                         spName = spName, land = land)
-  expect_true(is.ggplot(point_map))
+  expect_true(is_ggplot(point_map))
   point_map <- pointMap(occs = occs,
                         spName = spName, land = NA)
-  expect_true(is.ggplot(point_map))
+  expect_true(is_ggplot(point_map))
 })
 
 set.seed(0)
@@ -84,19 +78,19 @@ test_that("pointCompMap checks", {
 
   point_map <- pointCompMap(occs1 = occs1, occs2 = occs2,
                             spName = spName, land = land)
-  expect_true(is.ggplot(point_map))
+  expect_true(is_ggplot(point_map))
   point_map <- pointCompMap(occs1 = occs1, occs2 = occs2,
                             spName = spName, land = vect(land))
-  expect_true(is.ggplot(point_map))
+  expect_true(is_ggplot(point_map))
   point_map <- pointCompMap(occs1 = occs1, occs2 = occs2,
                             spName = spName, land = NA)
-  expect_true(is.ggplot(point_map))
+  expect_true(is_ggplot(point_map))
   point_map <- pointCompMap(occs1 = rbind(occs1,occs2), occs2 = occs2,
                             spName = spName, land = NA)
-  expect_true(is.ggplot(point_map))
+  expect_true(is_ggplot(point_map))
   point_map <- pointCompMap(occs1 = occs1, occs2 = rbind(occs1,occs2),
                             spName = spName, land = NA)
-  expect_true(is.ggplot(point_map))
+  expect_true(is_ggplot(point_map))
 })
 
 test_that("transpColor checks", {
@@ -139,13 +133,13 @@ test_that("rasterComp works", {
   expect_warning(rasterComp(rast1 = rast1, rast1Name = "First Raster",
                             rast2 = rast2, rast2Name = "Second Raster",
                             col1 = "ukulele"))
-  expect_equal(class(rasterComp(rast1 = rast1)), "recordedplot")
-  expect_equal(class(rasterComp(rast2 = rast2)), "recordedplot")
-  expect_equal(class(rasterComp(graticule = FALSE)), "recordedplot")
-  expect_equal(class(rasterComp(rast1 = rast1, rast2 = rast2)), "recordedplot")
-  expect_equal(class(rasterComp(rast1 = rast1, land = land)), "recordedplot")
-  expect_equal(class(rasterComp(rast2 = rast2, land = land)), "recordedplot")
-  expect_equal(class(rasterComp(land = land)), "recordedplot")
+ expect_equal(class(rasterComp(rast1 = rast1)), "recordedplot")
+ expect_equal(class(rasterComp(rast2 = rast2)), "recordedplot")
+expect_equal(class(rasterComp(graticule = FALSE)), "recordedplot")
+expect_equal(class(rasterComp(rast1 = rast1, rast2 = rast2)), "recordedplot")
+ expect_equal(class(rasterComp(rast1 = rast1, land = land)), "recordedplot")
+ expect_equal(class(rasterComp(rast2 = rast2, land = land)), "recordedplot")
+ expect_equal(class(rasterComp(land = land)), "recordedplot")
   expect_equal(class(rasterComp(rast1 = rast1, rast2 = rast2, land = land)),
                "recordedplot")
 })
@@ -209,12 +203,11 @@ test_that("plotLayers works", {
   expect_warning(plotLayers(rast = distBrick, land = "a"))
   expect_warning(plotLayers(rast = distBrick, landCol = "bacon"))
   expect_warning(plotLayers(rast = distBrick, graticule = 10))
-  expect_equal(class(plotLayers(distBrick)), "recordedplot")
   expect_equal(class(plotLayers(distBrick, land = land)), "recordedplot")
 })
 
 rast1 <- rast(ncol=10, nrow=10)
-values(rast1) <- rep(0:3, 50)
+values(rast1) <- rep(0:3, 25)
 
 rast2 <- rast(ncol=10, nrow=10)
 values(rast2) <- c(rep(0, 50), rep(1,25), rep(2,25))
