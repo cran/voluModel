@@ -187,8 +187,13 @@ indices <- unique(datForMod$index)
 projList <- list("AOU" = oxygenSmooth[[min(indices):max(indices)]], 
                  "Temperature" = temperature[[min(indices):max(indices)]])
 
+# Explicitly formatting calibration data
+calibration <- data.frame(
+  AOU = datForMod$AOU,
+  Temperature = datForMod$Temperature)
+
 # Calculate MESS
-messBrick <- MESS3D(calibration = datForMod, projection = projList)
+messBrick <- MESS3D(calibration = calibration, projection = projList)
 
 ## ----reclassify and plot extrapolation----------------------------------------
 # Reclassify MESS 
