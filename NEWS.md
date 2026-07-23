@@ -1,3 +1,7 @@
+# voluModel 0.2.5
+
+- Fixed `ggtext` bug in `pointCompMap()`.
+
 # voluModel 0.2.4
 
 - Bugs in maxent_3D() and partition_3D() resolved; corresponding tests updated.
